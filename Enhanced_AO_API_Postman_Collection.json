@@ -1,0 +1,93 @@
+{
+    "info": {
+        "name": "AO RAG API - Essential Endpoints",
+        "description": "Simplified collection with only essential endpoints: Suggestions, Assistant, and Chat",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "Get Suggestions",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "url": {
+                    "raw": "http://localhost:5001/suggestions",
+                    "protocol": "http",
+                    "host": [
+                        "localhost"
+                    ],
+                    "port": "5001",
+                    "path": [
+                        "suggestions"
+                    ]
+                },
+                "body": {
+                    "mode": "raw",
+                    "raw": "{}"
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Assistant Query",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "url": {
+                    "raw": "http://localhost:5001/assistant",
+                    "protocol": "http",
+                    "host": [
+                        "localhost"
+                    ],
+                    "port": "5001",
+                    "path": [
+                        "assistant"
+                    ]
+                },
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"query\": \"Show me AOs with high vulnerabilities\",\n  \"use_llm\": false\n}"
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Chat - Vulnerability Analysis",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "url": {
+                    "raw": "http://localhost:5001/chat",
+                    "protocol": "http",
+                    "host": [
+                        "localhost"
+                    ],
+                    "port": "5001",
+                    "path": [
+                        "chat"
+                    ]
+                },
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"vulnerability_name\": \"SQL Injection\",\n  \"description\": \"A code injection technique where malicious SQL statements are inserted into application queries\"\n}"
+                }
+            },
+            "response": []
+        }
+    ]
+}
