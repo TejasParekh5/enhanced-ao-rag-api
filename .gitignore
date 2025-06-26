@@ -1,0 +1,40 @@
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Virtual environment
+.venv/
+venv/
+ENV/
+
+# Data and model files (cached files)
+ao_rag_data.pkl
+ao_rag_faiss.index
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+
+# Allow all important project files
+!*.py
+!*.md
+!*.json
+!*.txt
+!*.xlsx
+!.gitignore

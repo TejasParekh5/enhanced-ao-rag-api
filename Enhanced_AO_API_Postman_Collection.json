@@ -1,12 +1,13 @@
 {
     "info": {
-        "name": "AO RAG API - Essential Endpoints",
-        "description": "Simplified collection with only essential endpoints: Suggestions, Assistant, and Chat",
-        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+        "name": "Optimized AO RAG API - Complete Collection",
+        "description": "Complete collection for the optimized AO RAG API with all four endpoints: Suggestions, Search, Statistics, and Health Check",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+        "version": "2.0-optimized"
     },
     "item": [
         {
-            "name": "Get Suggestions",
+            "name": "AO Suggestions - Comprehensive Analysis",
             "request": {
                 "method": "POST",
                 "header": [
@@ -28,13 +29,14 @@
                 },
                 "body": {
                     "mode": "raw",
-                    "raw": "{}"
-                }
+                    "raw": "{\n  \"ao_name\": \"Alice Singh\",\n  \"query\": \"What should I prioritize first?\",\n  \"use_llm\": true\n}"
+                },
+                "description": "Get comprehensive security analysis and recommendations for a specific Application Owner. Includes vulnerability assessment, compliance scoring, risk analysis, and prioritized action items."
             },
             "response": []
         },
         {
-            "name": "Assistant Query",
+            "name": "AO Suggestions - Without AI Enhancement",
             "request": {
                 "method": "POST",
                 "header": [
@@ -44,25 +46,26 @@
                     }
                 ],
                 "url": {
-                    "raw": "http://localhost:5001/assistant",
+                    "raw": "http://localhost:5001/suggestions",
                     "protocol": "http",
                     "host": [
                         "localhost"
                     ],
                     "port": "5001",
                     "path": [
-                        "assistant"
+                        "suggestions"
                     ]
                 },
                 "body": {
                     "mode": "raw",
-                    "raw": "{\n  \"query\": \"Show me AOs with high vulnerabilities\",\n  \"use_llm\": false\n}"
-                }
+                    "raw": "{\n  \"ao_name\": \"Deepa Nair\",\n  \"query\": \"What are the main security risks?\",\n  \"use_llm\": false\n}"
+                },
+                "description": "Get comprehensive analysis without AI enhancement - uses only the optimized data analysis algorithms."
             },
             "response": []
         },
         {
-            "name": "Chat - Vulnerability Analysis",
+            "name": "AO Suggestions - Invalid AO (Error Handling Test)",
             "request": {
                 "method": "POST",
                 "header": [
@@ -72,22 +75,157 @@
                     }
                 ],
                 "url": {
-                    "raw": "http://localhost:5001/chat",
+                    "raw": "http://localhost:5001/suggestions",
                     "protocol": "http",
                     "host": [
                         "localhost"
                     ],
                     "port": "5001",
                     "path": [
-                        "chat"
+                        "suggestions"
                     ]
                 },
                 "body": {
                     "mode": "raw",
-                    "raw": "{\n  \"vulnerability_name\": \"SQL Injection\",\n  \"description\": \"A code injection technique where malicious SQL statements are inserted into application queries\"\n}"
-                }
+                    "raw": "{\n  \"ao_name\": \"Invalid Name\",\n  \"query\": \"Test error handling\"\n}"
+                },
+                "description": "Test error handling for invalid AO names. Should return helpful error message with suggestions."
             },
             "response": []
+        },
+        {
+            "name": "Search - High Risk Applications",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "url": {
+                    "raw": "http://localhost:5001/search",
+                    "protocol": "http",
+                    "host": [
+                        "localhost"
+                    ],
+                    "port": "5001",
+                    "path": [
+                        "search"
+                    ]
+                },
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"query\": \"high risk applications\",\n  \"top_k\": 5\n}"
+                },
+                "description": "Semantic search for high-risk applications with similarity scoring and comprehensive result metadata."
+            },
+            "response": []
+        },
+        {
+            "name": "Search - Security Departments",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "url": {
+                    "raw": "http://localhost:5001/search",
+                    "protocol": "http",
+                    "host": [
+                        "localhost"
+                    ],
+                    "port": "5001",
+                    "path": [
+                        "search"
+                    ]
+                },
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"query\": \"Identity Access Management\",\n  \"top_k\": 10\n}"
+                },
+                "description": "Search for AOs in specific departments with expanded result set."
+            },
+            "response": []
+        },
+        {
+            "name": "Search - Critical Vulnerabilities",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "url": {
+                    "raw": "http://localhost:5001/search",
+                    "protocol": "http",
+                    "host": [
+                        "localhost"
+                    ],
+                    "port": "5001",
+                    "path": [
+                        "search"
+                    ]
+                },
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"query\": \"critical vulnerabilities\",\n  \"top_k\": 3\n}"
+                },
+                "description": "Find AOs with critical vulnerabilities - useful for prioritizing security efforts."
+            },
+            "response": []
+        },
+        {
+            "name": "System Statistics",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "http://localhost:5001/stats",
+                    "protocol": "http",
+                    "host": [
+                        "localhost"
+                    ],
+                    "port": "5001",
+                    "path": [
+                        "stats"
+                    ]
+                },
+                "description": "Get system-wide statistics including total AOs, applications, average risk scores, and high-risk AO counts."
+            },
+            "response": []
+        },
+        {
+            "name": "Health Check",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "http://localhost:5001/health",
+                    "protocol": "http",
+                    "host": [
+                        "localhost"
+                    ],
+                    "port": "5001",
+                    "path": [
+                        "health"
+                    ]
+                },
+                "description": "System health check - verify the API is running and properly initialized."
+            },
+            "response": []
+        }
+    ],
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "http://localhost:5001",
+            "type": "string"
         }
     ]
 }

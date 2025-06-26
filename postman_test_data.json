@@ -1,109 +1,116 @@
-[
-  {
-    "test_name": "suggestions_basic",
-    "endpoint": "/suggestions",
-    "method": "POST",
-    "body": {},
-    "description": "Basic suggestions endpoint test"
-  },
-  {
-    "test_name": "assistant_basic_query",
-    "endpoint": "/assistant",
-    "method": "POST",
-    "body": {
-      "query": "Show me all application owners",
-      "use_llm": false
+{
+    "ao_names": [
+        "Alice Singh",
+        "Deepa Nair",
+        "Pooja Reddy",
+        "Nisha Sharma",
+        "Lata Menon",
+        "Sneha Joshi",
+        "Sonal Desai",
+        "Priya Kapoor"
+    ],
+    "sample_queries": [
+        "What are the main security risks for this AO?",
+        "What should I prioritize first?",
+        "How can I improve compliance scores?",
+        "What are the critical vulnerabilities?",
+        "Show me the risk assessment details",
+        "What immediate actions are needed?",
+        "How does this AO compare to others?",
+        "What is the overall security posture?"
+    ],
+    "search_queries": [
+        "high risk applications",
+        "critical vulnerabilities",
+        "Identity Access Management",
+        "security architecture",
+        "compliance",
+        "incident response",
+        "vulnerability management",
+        "governance risk"
+    ],
+    "test_scenarios": {
+        "valid_ao_with_llm": {
+            "ao_name": "Alice Singh",
+            "query": "What should I prioritize first?",
+            "use_llm": true
+        },
+        "valid_ao_without_llm": {
+            "ao_name": "Deepa Nair",
+            "query": "What are the main security risks?",
+            "use_llm": false
+        },
+        "invalid_ao": {
+            "ao_name": "Invalid Name",
+            "query": "Test error handling"
+        },
+        "empty_ao_name": {
+            "ao_name": "",
+            "query": "Test validation"
+        },
+        "high_risk_search": {
+            "query": "high risk applications",
+            "top_k": 5
+        },
+        "department_search": {
+            "query": "Identity Access Management",
+            "top_k": 10
+        },
+        "vulnerability_search": {
+            "query": "critical vulnerabilities",
+            "top_k": 3
+        }
     },
-    "description": "Basic AO query without LLM enhancement"
-  },
-  {
-    "test_name": "assistant_vulnerability_query",
-    "endpoint": "/assistant",
-    "method": "POST",
-    "body": {
-      "query": "Find AOs with high vulnerabilities",
-      "use_llm": false
+    "expected_responses": {
+        "suggestions_success": {
+            "success": true,
+            "suggestions": {
+                "ao_information": "object",
+                "security_analysis": "object",
+                "priority_recommendations": "array",
+                "action_items": "object",
+                "compliance_guidance": "object",
+                "comparative_analysis": "object",
+                "risk_mitigation": "object"
+            }
+        },
+        "search_success": {
+            "success": true,
+            "query": "string",
+            "results": "array",
+            "total_found": "number",
+            "timestamp": "string"
+        },
+        "stats_success": {
+            "success": true,
+            "statistics": {
+                "total_aos": "number",
+                "total_applications": "number",
+                "avg_risk_score": "number",
+                "high_risk_aos": "number",
+                "last_updated": "string"
+            }
+        },
+        "health_success": {
+            "status": "healthy",
+            "system_initialized": true,
+            "timestamp": "string",
+            "version": "string"
+        }
     },
-    "description": "Query for high vulnerability AOs"
-  },
-  {
-    "test_name": "assistant_production_query",
-    "endpoint": "/assistant",
-    "method": "POST",
-    "body": {
-      "query": "Show me application owners in production environment",
-      "use_llm": false
+    "performance_benchmarks": {
+        "health_check": "< 200ms",
+        "stats": "< 300ms",
+        "search": "< 500ms",
+        "suggestions": "< 3s (with LLM), < 1s (without LLM)"
     },
-    "description": "Query for production environment AOs"
-  },
-  {
-    "test_name": "assistant_critical_apps_query",
-    "endpoint": "/assistant",
-    "method": "POST",
-    "body": {
-      "query": "Who are the AOs with critical applications?",
-      "use_llm": false
-    },
-    "description": "Query for critical application AOs"
-  },
-  {
-    "test_name": "assistant_compliance_query",
-    "endpoint": "/assistant",
-    "method": "POST",
-    "body": {
-      "query": "Show me AOs with poor compliance scores",
-      "use_llm": false
-    },
-    "description": "Query for poor compliance AOs"
-  },
-  {
-    "test_name": "assistant_enhanced_query",
-    "endpoint": "/assistant",
-    "method": "POST",
-    "body": {
-      "query": "Analyze the security posture of AOs with critical vulnerabilities",
-      "use_llm": true
-    },
-    "description": "Enhanced vulnerability analysis with LLM"
-  },
-  {
-    "test_name": "chat_sql_injection",
-    "endpoint": "/chat",
-    "method": "POST",
-    "body": {
-      "vulnerability_name": "SQL Injection",
-      "description": "A code injection technique where malicious SQL statements are inserted into application queries"
-    },
-    "description": "Chat about SQL Injection vulnerability"
-  },
-  {
-    "test_name": "chat_xss",
-    "endpoint": "/chat",
-    "method": "POST",
-    "body": {
-      "vulnerability_name": "Cross-Site Scripting",
-      "description": "A type of injection where malicious scripts are injected into trusted websites"
-    },
-    "description": "Chat about XSS vulnerability"
-  },
-  {
-    "test_name": "chat_csrf",
-    "endpoint": "/chat",
-    "method": "POST",
-    "body": {
-      "vulnerability_name": "Cross-Site Request Forgery",
-      "description": "An attack that forces an end user to execute unwanted actions on a web application"
-    },
-    "description": "Chat about CSRF vulnerability"
-  },  {
-    "test_name": "chat_with_code",
-    "endpoint": "/chat",
-    "method": "POST",
-    "body": {
-      "vulnerability_name": "SQL Injection",
-      "risk_rating": "High",
-      "code_snippet": "SELECT * FROM users WHERE username = '\" + userInput + \"' AND password = '\" + passwordInput + \"'"
-    },
-    "description": "Chat about SQL Injection with code snippet"
-  }
-]
+    "usage_tips": [
+        "Always start with a health check to ensure the system is running",
+        "Use stats endpoint to get an overview of the data",
+        "Search endpoint is great for finding relevant AOs before detailed analysis",
+        "Suggestions endpoint provides the most comprehensive analysis",
+        "Set use_llm: false for faster responses when AI analysis isn't needed",
+        "Use top_k parameter in search to control the number of results",
+        "Invalid AO names will return helpful suggestions for correction"
+    ]
+}
