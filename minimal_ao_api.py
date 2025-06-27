@@ -35,7 +35,7 @@ app = Flask(__name__)
 
 class Config:
     OLLAMA_URL = "http://localhost:11434/api/generate"
-    DEFAULT_MODEL = "llama3.2:1b"
+    DEFAULT_MODEL = "llama3.1:8b"
     EXCEL_FILE = "Cybersecurity_KPI_Minimal.xlsx"
     DATA_FILE = "ao_rag_data.pkl"
     INDEX_FILE = "ao_rag_faiss.index"
@@ -74,7 +74,7 @@ class OllamaService:
             }
 
             response = requests.post(
-                Config.OLLAMA_URL, json=payload, timeout=30)
+                Config.OLLAMA_URL, json=payload, timeout=300)
             response.raise_for_status()
 
             data = response.json()
