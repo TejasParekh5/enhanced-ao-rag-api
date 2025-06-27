@@ -24,19 +24,22 @@ from functools import lru_cache
 from collections import defaultdict
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
 # Configuration
+
+
 class Config:
     OLLAMA_URL = "http://localhost:11434/api/generate"
     DEFAULT_MODEL = "llama3.2:1b"
     EXCEL_FILE = "Cybersecurity_KPI_Minimal.xlsx"
     DATA_FILE = "ao_rag_data.pkl"
     INDEX_FILE = "ao_rag_faiss.index"
-    
+
     # Column mapping - maps our internal names to Excel column names
     COLUMN_MAPPING = {
         'ao_name': 'Application_Owner_Name',
@@ -57,7 +60,7 @@ class Config:
 
 class OllamaService:
     """Optimized Ollama service with better error handling and caching"""
-    
+
     @staticmethod
     @lru_cache(maxsize=100)
     def query_ollama(prompt: str, temperature: float = 0.7, model: str = Config.DEFAULT_MODEL) -> str:
@@ -69,13 +72,14 @@ class OllamaService:
                 "stream": False,
                 "options": {"temperature": temperature}
             }
-            
-            response = requests.post(Config.OLLAMA_URL, json=payload, timeout=30)
+
+            response = requests.post(
+                Config.OLLAMA_URL, json=payload, timeout=30)
             response.raise_for_status()
-            
+
             data = response.json()
             return data.get('response', 'No response from Ollama')
-            
+
         except requests.exceptions.ConnectionError:
             logger.warning("Ollama service unavailable")
             return "AI analysis unavailable - Ollama service not running"
@@ -87,8 +91,8 @@ class OllamaService:
             return f"AI analysis error: {str(e)}"
 
     @staticmethod
-    def analyze_vulnerability(vulnerability_name: str, code_snippet: str = "", 
-                            risk_rating: str = "", description: str = "") -> str:
+    def analyze_vulnerability(vulnerability_name: str, code_snippet: str = "",
+                              risk_rating: str = "", description: str = "") -> str:
         """Analyze vulnerability with improved prompts"""
         if not code_snippet and not risk_rating:
             # OWASP categorization mode
@@ -154,7 +158,7 @@ Focus on actionable insights and specific next steps.
 
 class DataProcessor:
     """Optimized data processing with better error handling"""
-    
+
     @staticmethod
     def safe_convert(value, convert_func, default=0):
         """Safely convert values with fallback"""
@@ -162,7 +166,7 @@ class DataProcessor:
             return convert_func(value) if pd.notna(value) else default
         except (ValueError, TypeError):
             return default
-    
+
     @staticmethod
     def calculate_vulnerability_stats(df_group: pd.DataFrame) -> Dict:
         """Calculate vulnerability statistics for an AO group"""
@@ -173,23 +177,24 @@ class DataProcessor:
             'low_vulnerabilities': 0,
             'critical_vulnerabilities': 0
         }
-        
+
         # Count by severity
         if 'Severity' in df_group.columns:
             severity_counts = df_group['Severity'].value_counts()
             stats['high_vulnerabilities'] = severity_counts.get('High', 0)
             stats['medium_vulnerabilities'] = severity_counts.get('Medium', 0)
             stats['low_vulnerabilities'] = severity_counts.get('Low', 0)
-            stats['critical_vulnerabilities'] = severity_counts.get('Critical', 0)
-        
+            stats['critical_vulnerabilities'] = severity_counts.get(
+                'Critical', 0)
+
         return stats
-    
+
     @staticmethod
     def calculate_risk_metrics(df_group: pd.DataFrame) -> Dict:
         """Calculate risk metrics for an AO group"""
         risk_scores = df_group['Risk_Score'].dropna()
         cvss_scores = df_group['CVSS_Score'].dropna()
-        
+
         return {
             'avg_risk_score': round(risk_scores.mean(), 2) if not risk_scores.empty else 0,
             'max_risk_score': round(risk_scores.max(), 2) if not risk_scores.empty else 0,
@@ -200,7 +205,7 @@ class DataProcessor:
 
 class AORAGSystem:
     """Optimized RAG system with improved performance and maintainability"""
-    
+
     def __init__(self, excel_file_path: str = Config.EXCEL_FILE):
         self.excel_file_path = excel_file_path
         self.model = None
@@ -209,14 +214,14 @@ class AORAGSystem:
         self.faiss_index = None
         self.data_file = Config.DATA_FILE
         self.index_file = Config.INDEX_FILE
-        
+
         # Performance tracking
         self.stats = {
             'total_aos': 0,
             'total_vulnerabilities': 0,
             'last_updated': None
         }
-        
+
         self._initialize_system()
 
     def _initialize_system(self):
@@ -225,10 +230,11 @@ class AORAGSystem:
             # Initialize sentence transformer
             logger.info("Loading sentence transformer model...")
             self.model = SentenceTransformer('all-MiniLM-L6-v2')
-            
+
             # Load or process data
             if self._load_processed_data():
-                logger.info(f"Loaded existing data: {self.stats['total_aos']} AOs")
+                logger.info(
+                    f"Loaded existing data: {self.stats['total_aos']} AOs")
             else:
                 logger.info("Processing data from scratch...")
                 self._process_excel_data()
@@ -236,7 +242,7 @@ class AORAGSystem:
                 self._build_faiss_index()
                 self._save_processed_data()
                 logger.info("Data processing completed")
-                
+
         except Exception as e:
             logger.error(f"System initialization failed: {e}")
             raise
@@ -246,14 +252,17 @@ class AORAGSystem:
         try:
             # Load Excel with error handling
             df = pd.read_excel(self.excel_file_path)
-            logger.info(f"Loaded Excel: {len(df)} rows, {len(df.columns)} columns")
-            
+            logger.info(
+                f"Loaded Excel: {len(df)} rows, {len(df.columns)} columns")
+
             # Validate required columns
-            required_cols = ['Application_Owner_Name', 'Application_Name', 'Risk_Score']
-            missing_cols = [col for col in required_cols if col not in df.columns]
+            required_cols = ['Application_Owner_Name',
+                             'Application_Name', 'Risk_Score']
+            missing_cols = [
+                col for col in required_cols if col not in df.columns]
             if missing_cols:
                 raise ValueError(f"Missing required columns: {missing_cols}")
-            
+
             # Group by Application Owner for aggregation
             grouped_data = defaultdict(lambda: {
                 'applications': set(),
@@ -262,25 +271,28 @@ class AORAGSystem:
                 'departments': set(),
                 'assets': set()
             })
-            
+
             # Process each row efficiently
             for _, row in df.iterrows():
-                ao_name = str(row.get('Application_Owner_Name', 'Unknown')).strip()
+                ao_name = str(
+                    row.get('Application_Owner_Name', 'Unknown')).strip()
                 if ao_name == 'Unknown' or not ao_name:
                     continue
-                
+
                 entry = grouped_data[ao_name]
-                
+
                 # Collect data
-                entry['applications'].add(str(row.get('Application_Name', 'Unknown')))
+                entry['applications'].add(
+                    str(row.get('Application_Name', 'Unknown')))
                 entry['departments'].add(str(row.get('Dept_Name', 'Unknown')))
                 entry['assets'].add(str(row.get('Asset_Name', 'Unknown')))
-                
+
                 # Risk scores
-                risk_score = DataProcessor.safe_convert(row.get('Risk_Score'), float)
+                risk_score = DataProcessor.safe_convert(
+                    row.get('Risk_Score'), float)
                 if risk_score > 0:
                     entry['risk_scores'].append(risk_score)
-                
+
                 # Vulnerability data
                 vuln_data = {
                     'description': str(row.get('Vulnerability_Description', '')),
@@ -290,22 +302,23 @@ class AORAGSystem:
                     'days_to_close': DataProcessor.safe_convert(row.get('Days_to_Close'), int)
                 }
                 entry['vulnerabilities'].append(vuln_data)
-            
+
             # Create final AO profiles
             self.ao_data = []
             for ao_name, data in grouped_data.items():
                 ao_profile = self._create_ao_profile(ao_name, data)
                 self.ao_data.append(ao_profile)
-            
+
             # Update stats
             self.stats.update({
                 'total_aos': len(self.ao_data),
                 'total_vulnerabilities': sum(len(data['vulnerabilities']) for data in grouped_data.values()),
                 'last_updated': datetime.now().isoformat()
             })
-            
-            logger.info(f"Processed {self.stats['total_aos']} AOs with {self.stats['total_vulnerabilities']} vulnerabilities")
-            
+
+            logger.info(
+                f"Processed {self.stats['total_aos']} AOs with {self.stats['total_vulnerabilities']} vulnerabilities")
+
         except Exception as e:
             logger.error(f"Excel processing failed: {e}")
             raise
@@ -314,17 +327,19 @@ class AORAGSystem:
         """Create optimized AO profile with calculated metrics"""
         vulnerabilities = data['vulnerabilities']
         risk_scores = data['risk_scores']
-        
+
         # Calculate vulnerability statistics
         vuln_stats = self._calculate_vulnerability_statistics(vulnerabilities)
-        
+
         # Calculate risk metrics
-        avg_risk = round(sum(risk_scores) / len(risk_scores), 2) if risk_scores else 0
+        avg_risk = round(sum(risk_scores) / len(risk_scores),
+                         2) if risk_scores else 0
         max_risk = round(max(risk_scores), 2) if risk_scores else 0
-        
+
         # Calculate compliance score (mock calculation based on vulnerabilities and risk)
-        compliance_score = self._calculate_compliance_score(vuln_stats, avg_risk)
-        
+        compliance_score = self._calculate_compliance_score(
+            vuln_stats, avg_risk)
+
         profile = {
             'ao_name': ao_name,
             'applications': list(data['applications']),
@@ -332,61 +347,62 @@ class AORAGSystem:
             'departments': list(data['departments']),
             'department': ', '.join(data['departments']),
             'assets': list(data['assets']),
-            
+
             # Risk metrics
             'risk_score': str(avg_risk),
             'max_risk_score': str(max_risk),
             'risk_score_entries': len(risk_scores),
-            
+
             # Vulnerability metrics
             'vulnerability_count': str(vuln_stats['total']),
             'high_vulnerabilities': str(vuln_stats['high']),
             'medium_vulnerabilities': str(vuln_stats['medium']),
             'low_vulnerabilities': str(vuln_stats['low']),
             'critical_vulnerabilities': str(vuln_stats['critical']),
-            
+
             # Calculated metrics
             'compliance_score': str(compliance_score),
             'criticality': self._determine_criticality(avg_risk, vuln_stats),
             'environment': self._determine_environment(data['applications']),
             'patching_status': self._determine_patching_status(vulnerabilities),
             'last_scan_date': self._get_latest_scan_date(vulnerabilities),
-            
+
             # Additional metrics
             'application_count': len(data['applications']),
             'asset_count': len(data['assets']),
             'avg_days_to_close': self._calculate_avg_days_to_close(vulnerabilities),
-            
+
             # Contact info (placeholder)
             'contact_info': f"{ao_name.replace(' ', '.').lower()}@company.com"
         }
-        
+
         # Create searchable text
         profile['searchable_text'] = self._create_searchable_text(profile)
-        
+
         return profile
 
     def _calculate_vulnerability_statistics(self, vulnerabilities: List[Dict]) -> Dict:
         """Calculate detailed vulnerability statistics"""
-        stats = {'total': len(vulnerabilities), 'critical': 0, 'high': 0, 'medium': 0, 'low': 0}
-        
+        stats = {'total': len(vulnerabilities), 'critical': 0,
+                 'high': 0, 'medium': 0, 'low': 0}
+
         for vuln in vulnerabilities:
             severity = vuln.get('severity', '').lower()
             if severity in stats:
                 stats[severity] += 1
-        
+
         return stats
 
     def _calculate_compliance_score(self, vuln_stats: Dict, avg_risk: float) -> float:
         """Calculate compliance score based on vulnerabilities and risk"""
         base_score = 100
-        
+
         # Deduct points for vulnerabilities
         base_score -= vuln_stats['critical'] * 20
         base_score -= vuln_stats['high'] * 10
         base_score -= vuln_stats['medium'] * 5
         base_score -= vuln_stats['low'] * 1
-        
+
         # Deduct points for high risk score
         if avg_risk > 8:
             base_score -= 20
@@ -394,7 +410,7 @@ class AORAGSystem:
             base_score -= 10
         elif avg_risk > 4:
             base_score -= 5
-        
+
         return max(0, round(base_score, 1))
 
     def _determine_criticality(self, avg_risk: float, vuln_stats: Dict) -> str:
@@ -422,10 +438,11 @@ class AORAGSystem:
         """Determine patching status based on vulnerability closure"""
         if not vulnerabilities:
             return 'Up-to-date'
-        
-        open_vulns = sum(1 for v in vulnerabilities if v.get('status', '').lower() not in ['closed', 'fixed', 'resolved'])
+
+        open_vulns = sum(1 for v in vulnerabilities if v.get(
+            'status', '').lower() not in ['closed', 'fixed', 'resolved'])
         total_vulns = len(vulnerabilities)
-        
+
         if open_vulns == 0:
             return 'Up-to-date'
         elif open_vulns / total_vulns > 0.5:
@@ -440,7 +457,8 @@ class AORAGSystem:
 
     def _calculate_avg_days_to_close(self, vulnerabilities: List[Dict]) -> float:
         """Calculate average days to close vulnerabilities"""
-        days_list = [v.get('days_to_close', 0) for v in vulnerabilities if v.get('days_to_close', 0) > 0]
+        days_list = [v.get('days_to_close', 0)
+                     for v in vulnerabilities if v.get('days_to_close', 0) > 0]
         return round(sum(days_list) / len(days_list), 1) if days_list else 0
 
     def _create_searchable_text(self, ao_profile: Dict) -> str:
@@ -464,10 +482,11 @@ class AORAGSystem:
         try:
             texts = [ao['searchable_text'] for ao in self.ao_data]
             logger.info(f"Creating embeddings for {len(texts)} AO profiles...")
-            
-            self.embeddings = self.model.encode(texts, show_progress_bar=True, batch_size=32)
+
+            self.embeddings = self.model.encode(
+                texts, show_progress_bar=True, batch_size=32)
             logger.info(f"Created embeddings: {self.embeddings.shape}")
-            
+
         except Exception as e:
             logger.error(f"Embedding creation failed: {e}")
             raise
@@ -477,13 +496,14 @@ class AORAGSystem:
         try:
             dimension = self.embeddings.shape[1]
             self.faiss_index = faiss.IndexFlatIP(dimension)
-            
+
             # Normalize for cosine similarity
             faiss.normalize_L2(self.embeddings)
             self.faiss_index.add(self.embeddings.astype('float32'))
-            
-            logger.info(f"Built FAISS index: {self.faiss_index.ntotal} vectors")
-            
+
+            logger.info(
+                f"Built FAISS index: {self.faiss_index.ntotal} vectors")
+
         except Exception as e:
             logger.error(f"FAISS index creation failed: {e}")
             raise
@@ -497,13 +517,13 @@ class AORAGSystem:
                 'stats': self.stats,
                 'version': '2.0'
             }
-            
+
             with open(self.data_file, 'wb') as f:
                 pickle.dump(data_to_save, f, protocol=pickle.HIGHEST_PROTOCOL)
-            
+
             faiss.write_index(self.faiss_index, self.index_file)
             logger.info("Saved processed data and index")
-            
+
         except Exception as e:
             logger.error(f"Data saving failed: {e}")
             raise
@@ -513,23 +533,23 @@ class AORAGSystem:
         try:
             if not (os.path.exists(self.data_file) and os.path.exists(self.index_file)):
                 return False
-            
+
             with open(self.data_file, 'rb') as f:
                 data = pickle.load(f)
-            
+
             # Version compatibility check
             if data.get('version', '1.0') != '2.0':
                 logger.info("Data version mismatch - will regenerate")
                 return False
-            
+
             self.ao_data = data['ao_data']
             self.embeddings = data['embeddings']
             self.stats = data.get('stats', {})
-            
+
             self.faiss_index = faiss.read_index(self.index_file)
-            
+
             return True
-            
+
         except Exception as e:
             logger.warning(f"Data loading failed: {e}")
             return False
@@ -540,14 +560,15 @@ class AORAGSystem:
         try:
             if not self.model or not self.faiss_index:
                 return []
-            
+
             # Create and normalize query embedding
             query_embedding = self.model.encode([query])
             faiss.normalize_L2(query_embedding)
-            
+
             # Search
-            scores, indices = self.faiss_index.search(query_embedding.astype('float32'), top_k)
-            
+            scores, indices = self.faiss_index.search(
+                query_embedding.astype('float32'), top_k)
+
             results = []
             for i, (score, idx) in enumerate(zip(scores[0], indices[0])):
                 if idx < len(self.ao_data) and score > 0.1:  # Relevance threshold
@@ -555,9 +576,9 @@ class AORAGSystem:
                     ao['similarity_score'] = float(score)
                     ao['rank'] = i + 1
                     results.append(ao)
-            
+
             return results
-            
+
         except Exception as e:
             logger.error(f"AO search failed: {e}")
             return []
@@ -572,9 +593,9 @@ class AORAGSystem:
                     "available_aos": [ao['ao_name'] for ao in self.ao_data[:10]],
                     "total_aos": len(self.ao_data)
                 }
-            
+
             return self._get_ao_specific_suggestions(ao_name.strip(), use_llm)
-            
+
         except Exception as e:
             logger.error(f"Suggestions generation failed: {e}")
             return {
@@ -584,10 +605,10 @@ class AORAGSystem:
             }
 
     def _get_ao_specific_suggestions(self, ao_name: str, use_llm: bool = False) -> Dict:
-        """Generate comprehensive AO-specific suggestions"""
+        """Generate LLM-powered AO-specific suggestions"""
         # Find matching AO
         target_ao = self._find_ao_by_name(ao_name)
-        
+
         if not target_ao:
             similar_aos = self._find_similar_ao_names(ao_name)
             return {
@@ -601,45 +622,84 @@ class AORAGSystem:
                     "Use first or last name only"
                 ]
             }
-        
-        # Generate comprehensive response
+
+        # Always use LLM for suggestions (ignore use_llm parameter for suggestions)
+        context = self._build_ao_context(target_ao)
+
+        # Generate comprehensive LLM-powered suggestions
+        suggestions_prompt = f"""
+You are a senior cybersecurity analyst. Based on the following Application Owner profile, provide a comprehensive security analysis and actionable recommendations.
+
+{context}
+
+Please provide a well-structured response in the following format:
+
+**EXECUTIVE SUMMARY**
+[Brief overview of security posture]
+
+**CRITICAL FINDINGS**
+[Top 3-5 most important security issues that need immediate attention]
+
+**RISK ASSESSMENT**
+[Current risk level and main risk factors]
+
+**IMMEDIATE ACTIONS** (Next 1-2 weeks)
+[Specific actions with highest priority]
+
+**SHORT-TERM GOALS** (1-3 months)
+[Medium-term improvements and objectives]
+
+**LONG-TERM STRATEGY** (3-12 months)
+[Strategic security initiatives]
+
+**COMPLIANCE RECOMMENDATIONS**
+[Specific guidance on meeting compliance requirements]
+
+**COMPARATIVE ANALYSIS**
+[How this AO compares to industry standards/peers]
+
+Provide specific, actionable recommendations tailored to this Application Owner's profile.
+"""
+
+        llm_response = OllamaService.query_ollama(
+            suggestions_prompt, temperature=0.6)
+
         response = {
             "status": "ao_found",
             "match_type": target_ao.get('match_type', 'exact'),
-            "ao_information": self._build_detailed_ao_info(target_ao),
-            "security_analysis": self._generate_security_analysis(target_ao),
-            "action_items": self._generate_action_items(target_ao),
-            "priority_recommendations": self._get_priority_recommendations(target_ao),
-            "compliance_guidance": self._get_compliance_guidance(target_ao),
-            "risk_mitigation": self._get_risk_mitigation_steps(target_ao),
-            "comparative_analysis": self._generate_comparative_analysis(target_ao)
+            "ao_profile": {
+                "ao_name": target_ao['ao_name'],
+                "applications": target_ao['applications'],
+                "department": target_ao['department'],
+                "risk_score": target_ao['risk_score'],
+                "compliance_score": target_ao['compliance_score'],
+                "vulnerability_count": target_ao['vulnerability_count'],
+                "criticality": target_ao['criticality'],
+                "environment": target_ao['environment']
+            },
+            "ai_analysis": llm_response,
+            "ai_enhanced": True,
+            "generation_timestamp": datetime.now().isoformat()
         }
-        
-        # Add AI enhancement if requested
-        if use_llm:
-            response.update(self._add_ai_enhancement(target_ao))
-        else:
-            response["ai_enhanced"] = False
-            response["ai_note"] = "Set 'use_llm': true for AI-powered analysis"
-        
+
         return response
 
     def _find_ao_by_name(self, ao_name: str) -> Optional[Dict]:
         """Optimized AO finding with fuzzy matching"""
         ao_name_lower = ao_name.lower().strip()
-        
+
         # Exact match first
         for ao in self.ao_data:
             if ao['ao_name'].lower() == ao_name_lower:
                 ao['match_type'] = 'exact'
                 return ao
-        
+
         # Partial match
         for ao in self.ao_data:
             if ao_name_lower in ao['ao_name'].lower():
                 ao['match_type'] = 'partial'
                 return ao
-        
+
         # Word match
         search_words = ao_name_lower.split()
         for ao in self.ao_data:
@@ -647,24 +707,24 @@ class AORAGSystem:
             if any(word in ao_words for word in search_words):
                 ao['match_type'] = 'word'
                 return ao
-        
+
         return None
 
     def _find_similar_ao_names(self, search_name: str) -> List[str]:
         """Find similar AO names using better fuzzy matching"""
         search_lower = search_name.lower()
         similar_names = []
-        
+
         for ao in self.ao_data:
             ao_name = ao['ao_name']
             ao_lower = ao_name.lower()
-            
+
             # Various similarity checks
             if (search_lower in ao_lower or
                 any(word in ao_lower for word in search_lower.split()) or
-                any(word in search_lower for word in ao_lower.split())):
+                    any(word in search_lower for word in ao_lower.split())):
                 similar_names.append(ao_name)
-        
+
         return sorted(list(set(similar_names)))
 
     def _build_detailed_ao_info(self, ao: Dict) -> Dict:
@@ -701,7 +761,7 @@ class AORAGSystem:
     def _calculate_vuln_percentages(self, ao: Dict) -> Dict:
         """Calculate vulnerability distribution percentages"""
         total = max(int(ao['vulnerability_count']), 1)
-        
+
         return {
             "critical_percentage": round((int(ao.get('critical_vulnerabilities', 0)) / total) * 100, 1),
             "high_percentage": round((int(ao['high_vulnerabilities']) / total) * 100, 1),
@@ -718,13 +778,13 @@ class AORAGSystem:
             "risk_assessment": "",
             "security_score": 0
         }
-        
+
         try:
             risk_score = float(ao['risk_score'])
             compliance = float(ao['compliance_score'])
             high_vulns = int(ao['high_vulnerabilities'])
             critical_vulns = int(ao.get('critical_vulnerabilities', 0))
-            
+
             # Overall posture assessment
             if risk_score >= 8 or critical_vulns > 0:
                 analysis["overall_security_posture"] = "🔴 CRITICAL - Immediate action required"
@@ -738,44 +798,54 @@ class AORAGSystem:
             else:
                 analysis["overall_security_posture"] = "🟢 GOOD - Acceptable security posture"
                 analysis["security_score"] = 90
-            
+
             # Critical concerns
             if critical_vulns > 0:
-                analysis["critical_concerns"].append(f"🚨 {critical_vulns} critical vulnerabilities need immediate attention")
+                analysis["critical_concerns"].append(
+                    f"🚨 {critical_vulns} critical vulnerabilities need immediate attention")
             if high_vulns > 0:
-                analysis["critical_concerns"].append(f"⚠️ {high_vulns} high-severity vulnerabilities require remediation")
+                analysis["critical_concerns"].append(
+                    f"⚠️ {high_vulns} high-severity vulnerabilities require remediation")
             if compliance < 70:
-                analysis["critical_concerns"].append(f"📋 Compliance score ({compliance}%) below acceptable threshold")
+                analysis["critical_concerns"].append(
+                    f"📋 Compliance score ({compliance}%) below acceptable threshold")
             if ao['patching_status'].lower() in ['outdated', 'overdue']:
-                analysis["critical_concerns"].append(f"🔧 Patching status indicates updates needed")
-            
+                analysis["critical_concerns"].append(
+                    f"🔧 Patching status indicates updates needed")
+
             # Positive aspects
             if compliance >= 85:
-                analysis["positive_aspects"].append(f"✅ Good compliance score ({compliance}%)")
+                analysis["positive_aspects"].append(
+                    f"✅ Good compliance score ({compliance}%)")
             if high_vulns == 0 and critical_vulns == 0:
-                analysis["positive_aspects"].append("✅ No high or critical vulnerabilities")
+                analysis["positive_aspects"].append(
+                    "✅ No high or critical vulnerabilities")
             if ao['patching_status'].lower() == 'up-to-date':
-                analysis["positive_aspects"].append("✅ Current with security patches")
+                analysis["positive_aspects"].append(
+                    "✅ Current with security patches")
             if risk_score < 4:
-                analysis["positive_aspects"].append("✅ Low risk score indicates good security controls")
-            
+                analysis["positive_aspects"].append(
+                    "✅ Low risk score indicates good security controls")
+
             # Risk assessment
             risk_factors = []
             if critical_vulns > 0:
-                risk_factors.append(f"{critical_vulns} critical vulnerabilities")
+                risk_factors.append(
+                    f"{critical_vulns} critical vulnerabilities")
             if high_vulns > 0:
-                risk_factors.append(f"{high_vulns} high-severity vulnerabilities")
+                risk_factors.append(
+                    f"{high_vulns} high-severity vulnerabilities")
             if compliance < 75:
                 risk_factors.append("below-standard compliance")
             if ao['criticality'].lower() in ['critical', 'high']:
                 risk_factors.append("high business criticality")
-            
+
             analysis["risk_assessment"] = f"Key risk factors: {', '.join(risk_factors)}" if risk_factors else "No major risk factors identified"
-            
+
         except Exception as e:
             logger.error(f"Security analysis error: {e}")
             analysis["error"] = "Analysis partially unavailable"
-        
+
         return analysis
 
     def _generate_action_items(self, ao: Dict) -> Dict:
@@ -785,36 +855,42 @@ class AORAGSystem:
             "short_term_goals": [],
             "long_term_strategy": []
         }
-        
+
         try:
             high_vulns = int(ao['high_vulnerabilities'])
             critical_vulns = int(ao.get('critical_vulnerabilities', 0))
             medium_vulns = int(ao['medium_vulnerabilities'])
             risk_score = float(ao['risk_score'])
             compliance = float(ao['compliance_score'])
-            
+
             # Immediate actions (1-2 weeks)
             if critical_vulns > 0:
-                actions["immediate_actions"].append(f"🚨 URGENT: Address {critical_vulns} critical vulnerabilities")
+                actions["immediate_actions"].append(
+                    f"🚨 URGENT: Address {critical_vulns} critical vulnerabilities")
             if high_vulns > 0:
-                actions["immediate_actions"].append(f"⚠️ Remediate {high_vulns} high-severity vulnerabilities")
+                actions["immediate_actions"].append(
+                    f"⚠️ Remediate {high_vulns} high-severity vulnerabilities")
             if ao['patching_status'].lower() in ['outdated', 'overdue']:
-                actions["immediate_actions"].append("🔧 Apply critical security patches")
+                actions["immediate_actions"].append(
+                    "🔧 Apply critical security patches")
             if risk_score >= 8:
-                actions["immediate_actions"].append("🔍 Conduct emergency security assessment")
-            
+                actions["immediate_actions"].append(
+                    "🔍 Conduct emergency security assessment")
+
             # Short-term goals (1-3 months)
             if medium_vulns > 5:
-                actions["short_term_goals"].append(f"📋 Address {medium_vulns} medium-severity vulnerabilities")
+                actions["short_term_goals"].append(
+                    f"📋 Address {medium_vulns} medium-severity vulnerabilities")
             if compliance < 80:
-                actions["short_term_goals"].append(f"📈 Improve compliance from {compliance}% to 85%+")
-            
+                actions["short_term_goals"].append(
+                    f"📈 Improve compliance from {compliance}% to 85%+")
+
             actions["short_term_goals"].extend([
                 "🔄 Implement regular vulnerability scanning",
                 "📚 Security awareness training for teams",
                 "🛡️ Review and update security policies"
             ])
-            
+
             # Long-term strategy (3-12 months)
             actions["long_term_strategy"].extend([
                 "🏗️ Integrate security into development lifecycle",
@@ -823,26 +899,27 @@ class AORAGSystem:
                 "🤝 Strengthen security team collaboration",
                 "🔮 Plan for emerging security threats"
             ])
-            
+
             if ao['criticality'].lower() in ['critical', 'high']:
-                actions["long_term_strategy"].append("🛡️ Enhanced security controls for critical systems")
-        
+                actions["long_term_strategy"].append(
+                    "🛡️ Enhanced security controls for critical systems")
+
         except Exception as e:
             logger.error(f"Action items generation error: {e}")
             actions["error"] = "Some action items unavailable"
-        
+
         return actions
 
     def _get_priority_recommendations(self, ao: Dict) -> List[Dict]:
         """Get top priority recommendations"""
         recommendations = []
-        
+
         try:
             high_vulns = int(ao['high_vulnerabilities'])
             critical_vulns = int(ao.get('critical_vulnerabilities', 0))
             risk_score = float(ao['risk_score'])
             compliance = float(ao['compliance_score'])
-            
+
             if critical_vulns > 0:
                 recommendations.append({
                     "priority": 1,
@@ -851,7 +928,7 @@ class AORAGSystem:
                     "timeline": "1-2 weeks",
                     "effort": "High"
                 })
-            
+
             if high_vulns > 0:
                 recommendations.append({
                     "priority": 2,
@@ -860,7 +937,7 @@ class AORAGSystem:
                     "timeline": "2-4 weeks",
                     "effort": "Medium-High"
                 })
-            
+
             if compliance < 75:
                 recommendations.append({
                     "priority": 3,
@@ -869,14 +946,14 @@ class AORAGSystem:
                     "timeline": "1-3 months",
                     "effort": "Medium"
                 })
-            
+
             # Fill remaining slots
             default_actions = [
                 "Implement security monitoring",
                 "Update incident response plan",
                 "Conduct security training"
             ]
-            
+
             for i, action in enumerate(default_actions):
                 if len(recommendations) < 5:
                     recommendations.append({
@@ -886,10 +963,10 @@ class AORAGSystem:
                         "timeline": "1-2 months",
                         "effort": "Medium"
                     })
-        
+
         except Exception as e:
             logger.error(f"Priority recommendations error: {e}")
-        
+
         return recommendations[:5]
 
     def _get_compliance_guidance(self, ao: Dict) -> Dict:
@@ -900,10 +977,10 @@ class AORAGSystem:
             "gap_analysis": [],
             "improvement_plan": []
         }
-        
+
         try:
             compliance = float(ao['compliance_score'])
-            
+
             if compliance >= 90:
                 guidance["current_status"] = "Excellent - Exceeds requirements"
             elif compliance >= 80:
@@ -912,7 +989,7 @@ class AORAGSystem:
                 guidance["current_status"] = "Acceptable - Some improvements needed"
             else:
                 guidance["current_status"] = "Poor - Significant work required"
-            
+
             if compliance < 85:
                 guidance["gap_analysis"] = [
                     "Security policy enforcement",
@@ -921,7 +998,7 @@ class AORAGSystem:
                     "Access control management",
                     "Data protection measures"
                 ]
-                
+
                 guidance["improvement_plan"] = [
                     f"Target: Increase from {compliance}% to {guidance['target_score']}%",
                     "Conduct compliance gap assessment",
@@ -929,11 +1006,11 @@ class AORAGSystem:
                     "Establish compliance monitoring",
                     "Regular compliance audits"
                 ]
-        
+
         except Exception as e:
             logger.error(f"Compliance guidance error: {e}")
             guidance["error"] = "Guidance partially unavailable"
-        
+
         return guidance
 
     def _get_risk_mitigation_steps(self, ao: Dict) -> Dict:
@@ -944,12 +1021,12 @@ class AORAGSystem:
             "monitoring_plan": [],
             "success_metrics": []
         }
-        
+
         try:
             risk_score = float(ao['risk_score'])
             high_vulns = int(ao['high_vulnerabilities'])
             critical_vulns = int(ao.get('critical_vulnerabilities', 0))
-            
+
             # Risk level assessment
             if risk_score >= 8 or critical_vulns > 0:
                 mitigation["risk_level"] = "CRITICAL - Immediate action required"
@@ -959,7 +1036,7 @@ class AORAGSystem:
                 mitigation["risk_level"] = "MEDIUM - Manageable with controls"
             else:
                 mitigation["risk_level"] = "LOW - Maintain current posture"
-            
+
             # Mitigation strategy
             if critical_vulns > 0:
                 mitigation["mitigation_strategy"].extend([
@@ -967,21 +1044,21 @@ class AORAGSystem:
                     "Implement emergency security controls",
                     "Increase security monitoring"
                 ])
-            
+
             if high_vulns > 0:
                 mitigation["mitigation_strategy"].extend([
                     f"Prioritize {high_vulns} high-severity vulnerabilities",
                     "Deploy compensating controls",
                     "Enhanced system monitoring"
                 ])
-            
+
             mitigation["mitigation_strategy"].extend([
                 "Regular security assessments",
                 "Defense-in-depth implementation",
                 "Incident response readiness",
                 "Security team training"
             ])
-            
+
             # Monitoring plan
             mitigation["monitoring_plan"] = [
                 "Daily security event monitoring",
@@ -989,7 +1066,7 @@ class AORAGSystem:
                 "Monthly risk assessments",
                 "Quarterly security reviews"
             ]
-            
+
             # Success metrics
             mitigation["success_metrics"] = [
                 f"Reduce risk score to below 4.0",
@@ -997,32 +1074,35 @@ class AORAGSystem:
                 "Compliance score above 85%",
                 "Mean time to remediation < 30 days"
             ]
-        
+
         except Exception as e:
             logger.error(f"Risk mitigation error: {e}")
             mitigation["error"] = "Mitigation plan partially unavailable"
-        
+
         return mitigation
 
     def _generate_comparative_analysis(self, ao: Dict) -> Dict:
         """Generate peer comparison analysis"""
         try:
             # Calculate peer statistics
-            all_risk_scores = [float(a['risk_score']) for a in self.ao_data if a['risk_score'] != '0']
-            all_compliance = [float(a['compliance_score']) for a in self.ao_data if a['compliance_score'] != '0']
-            all_high_vulns = [int(a['high_vulnerabilities']) for a in self.ao_data]
-            
+            all_risk_scores = [float(a['risk_score'])
+                               for a in self.ao_data if a['risk_score'] != '0']
+            all_compliance = [float(a['compliance_score'])
+                              for a in self.ao_data if a['compliance_score'] != '0']
+            all_high_vulns = [int(a['high_vulnerabilities'])
+                              for a in self.ao_data]
+
             current_risk = float(ao['risk_score'])
             current_compliance = float(ao['compliance_score'])
             current_high_vulns = int(ao['high_vulnerabilities'])
-            
+
             analysis = {
                 "peer_comparison": {},
                 "industry_position": "",
                 "percentile_ranking": {},
                 "benchmarking": {}
             }
-            
+
             if all_risk_scores:
                 avg_risk = sum(all_risk_scores) / len(all_risk_scores)
                 analysis["peer_comparison"]["risk_score"] = {
@@ -1030,12 +1110,14 @@ class AORAGSystem:
                     "peer_average": round(avg_risk, 2),
                     "position": "Above Average" if current_risk > avg_risk else "Below Average"
                 }
-                
+
                 # Percentile calculation
-                better_than = sum(1 for score in all_risk_scores if current_risk < score)
+                better_than = sum(
+                    1 for score in all_risk_scores if current_risk < score)
                 percentile = (better_than / len(all_risk_scores)) * 100
-                analysis["percentile_ranking"]["risk"] = f"Better than {round(percentile, 1)}% of peers"
-            
+                analysis["percentile_ranking"][
+                    "risk"] = f"Better than {round(percentile, 1)}% of peers"
+
             if all_compliance:
                 avg_compliance = sum(all_compliance) / len(all_compliance)
                 analysis["peer_comparison"]["compliance"] = {
@@ -1043,7 +1125,7 @@ class AORAGSystem:
                     "peer_average": round(avg_compliance, 2),
                     "position": "Above Average" if current_compliance > avg_compliance else "Below Average"
                 }
-            
+
             # Industry position
             if current_risk <= 3 and current_compliance >= 85:
                 analysis["industry_position"] = "🟢 Top Performer"
@@ -1053,16 +1135,16 @@ class AORAGSystem:
                 analysis["industry_position"] = "🟠 Average Performer"
             else:
                 analysis["industry_position"] = "🔴 Below Average"
-            
+
             # Benchmarking targets
             analysis["benchmarking"] = {
                 "target_risk_score": "< 4.0 (Industry Best Practice)",
                 "target_compliance": "> 85% (Excellence Standard)",
                 "target_vulnerabilities": "Zero high/critical vulnerabilities"
             }
-            
+
             return analysis
-            
+
         except Exception as e:
             logger.error(f"Comparative analysis error: {e}")
             return {"error": "Comparative analysis unavailable"}
@@ -1071,7 +1153,7 @@ class AORAGSystem:
         """Add AI-powered analysis"""
         try:
             context = self._build_ao_context(ao)
-            
+
             # Generate AI analysis
             detailed_query = f"""
             Provide expert cybersecurity analysis for this Application Owner:
@@ -1082,28 +1164,29 @@ class AORAGSystem:
             3. Strategic recommendations with timelines
             4. Industry best practices applicable
             """
-            
-            ai_analysis = OllamaService.enhance_ao_response(detailed_query, context)
-            
+
+            ai_analysis = OllamaService.enhance_ao_response(
+                detailed_query, context)
+
             # Generate specific AI suggestions
             suggestions_query = f"""
             Based on this security profile, provide 5 specific, actionable recommendations:
             
             Focus on immediate wins, medium-term improvements, and long-term strategy.
             """
-            
+
             ai_suggestions = OllamaService.query_ollama(
                 suggestions_query + "\n\n" + context,
                 temperature=0.6
             )
-            
+
             return {
                 "ai_enhanced": True,
                 "ai_powered_analysis": ai_analysis,
                 "ai_specific_suggestions": ai_suggestions,
                 "ai_confidence": "high" if "unavailable" not in ai_analysis.lower() else "low"
             }
-            
+
         except Exception as e:
             logger.error(f"AI enhancement failed: {e}")
             return {
@@ -1135,8 +1218,61 @@ class AORAGSystem:
             f"Avg Days to Close: {ao.get('avg_days_to_close', 'N/A')}",
             f"Application Count: {ao['application_count']}"
         ]
-        
+
         return "\n".join(context_parts)
+
+    def generate_llm_search_analysis(self, query: str, matching_aos: List[Dict]) -> str:
+        """Generate LLM analysis for search results"""
+        if not matching_aos:
+            return "No matching Application Owners found for the given query."
+
+        # Build context for LLM
+        context_parts = [f"Search Query: {query}",
+                         "", "Matching Application Owners:"]
+
+        # Limit to top 5 for context
+        for i, ao in enumerate(matching_aos[:5], 1):
+            context_parts.extend([
+                f"\n{i}. {ao['ao_name']}",
+                f"   Applications: {ao.get('application', 'N/A')}",
+                f"   Risk Score: {ao['risk_score']}/10",
+                f"   Compliance: {ao['compliance_score']}%",
+                f"   Vulnerabilities: {ao['vulnerability_count']} (High: {ao['high_vulnerabilities']})",
+                f"   Criticality: {ao['criticality']}",
+                f"   Department: {ao.get('department', 'N/A')}"
+            ])
+
+        context = "\n".join(context_parts)
+
+        analysis_prompt = f"""
+You are a cybersecurity analyst reviewing Application Owner data. Based on the search query and matching results below, provide a comprehensive analysis.
+
+{context}
+
+Please provide a structured analysis in the following format:
+
+**SEARCH SUMMARY**
+[Brief overview of what was found]
+
+**KEY FINDINGS**
+[Main insights from the search results]
+
+**RISK ANALYSIS**
+[Risk assessment of the matching AOs]
+
+**PRIORITY ATTENTION**
+[Which AOs need immediate focus and why]
+
+**RECOMMENDED ACTIONS**
+[Specific next steps based on the findings]
+
+**COMPARATIVE INSIGHTS**
+[How these AOs compare in terms of security posture]
+
+Provide specific, actionable insights based on the search results.
+"""
+
+        return OllamaService.query_ollama(analysis_prompt, temperature=0.6)
 
     # Additional utility methods for the API endpoints...
     def get_system_stats(self) -> Dict:
@@ -1189,13 +1325,13 @@ def get_suggestions():
                 "available_aos": [ao['ao_name'] for ao in rag_system.ao_data[:10]]
             }), 400
 
-        suggestions = rag_system.get_suggestions(ao_name=ao_name, use_llm=use_llm)
+        suggestions = rag_system.get_suggestions(
+            ao_name=ao_name, use_llm=use_llm)
 
         return jsonify({
             "success": True,
             "suggestions": suggestions,
-            "timestamp": datetime.now().isoformat(),
-            "system_stats": rag_system.get_system_stats()
+            "timestamp": datetime.now().isoformat()
         }), 200
 
     except Exception as e:
@@ -1209,7 +1345,7 @@ def get_suggestions():
 
 @app.route('/search', methods=['POST'])
 def search_aos():
-    """Enhanced search endpoint"""
+    """Enhanced search endpoint with LLM analysis"""
     try:
         if not rag_system:
             return jsonify({"error": "RAG system not initialized"}), 500
@@ -1231,13 +1367,35 @@ def search_aos():
                 "error": "Query cannot be empty"
             }), 400
 
+        # Get search results
         results = rag_system.search_aos(query, top_k)
+
+        # Generate LLM analysis
+        llm_analysis = rag_system.generate_llm_search_analysis(query, results)
+
+        # Simplified result format with essential data
+        simplified_results = []
+        for ao in results:
+            simplified_results.append({
+                "ao_name": ao['ao_name'],
+                "applications": ao.get('applications', []),
+                "risk_score": ao['risk_score'],
+                "compliance_score": ao['compliance_score'],
+                "vulnerability_count": ao['vulnerability_count'],
+                "high_vulnerabilities": ao['high_vulnerabilities'],
+                "criticality": ao['criticality'],
+                "department": ao.get('department', 'N/A'),
+                "similarity_score": ao.get('similarity_score', 0),
+                "rank": ao.get('rank', 0)
+            })
 
         return jsonify({
             "success": True,
             "query": query,
-            "results": results,
+            "ai_analysis": llm_analysis,
+            "matching_aos": simplified_results,
             "total_found": len(results),
+            "ai_enhanced": True,
             "timestamp": datetime.now().isoformat()
         }), 200
 
@@ -1258,7 +1416,7 @@ def get_stats():
             return jsonify({"error": "RAG system not initialized"}), 500
 
         stats = rag_system.get_system_stats()
-        
+
         return jsonify({
             "success": True,
             "statistics": stats,

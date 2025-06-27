@@ -17,7 +17,11 @@
         "Show me the risk assessment details",
         "What immediate actions are needed?",
         "How does this AO compare to others?",
-        "What is the overall security posture?"
+        "What is the overall security posture?",
+        "Provide comprehensive security analysis",
+        "Give me actionable recommendations",
+        "What are the compliance requirements?",
+        "How can I reduce risk exposure?"
     ],
     "search_queries": [
         "high risk applications",
@@ -31,55 +35,149 @@
     ],
     "test_scenarios": {
         "valid_ao_with_llm": {
-            "ao_name": "Alice Singh",
-            "query": "What should I prioritize first?",
-            "use_llm": true
+            "endpoint": "/suggestions",
+            "method": "POST",
+            "body": {
+                "ao_name": "Alice Singh",
+                "use_llm": true
+            },
+            "description": "Test suggestions endpoint with LLM analysis for valid AO"
         },
         "valid_ao_without_llm": {
-            "ao_name": "Deepa Nair",
-            "query": "What are the main security risks?",
-            "use_llm": false
+            "endpoint": "/suggestions",
+            "method": "POST",
+            "body": {
+                "ao_name": "Deepa Nair",
+                "use_llm": false
+            },
+            "description": "Test suggestions endpoint without LLM (still uses LLM in current implementation)"
         },
         "invalid_ao": {
-            "ao_name": "Invalid Name",
-            "query": "Test error handling"
+            "endpoint": "/suggestions",
+            "method": "POST",
+            "body": {
+                "ao_name": "Invalid Name"
+            },
+            "description": "Test error handling for non-existent AO"
         },
         "empty_ao_name": {
-            "ao_name": "",
-            "query": "Test validation"
+            "endpoint": "/suggestions",
+            "method": "POST",
+            "body": {
+                "ao_name": ""
+            },
+            "description": "Test validation for empty AO name"
+        },
+        "missing_ao_name": {
+            "endpoint": "/suggestions",
+            "method": "POST",
+            "body": {},
+            "description": "Test validation for missing AO name parameter"
         },
         "high_risk_search": {
-            "query": "high risk applications",
-            "top_k": 5
+            "endpoint": "/search",
+            "method": "POST",
+            "body": {
+                "query": "high risk applications",
+                "top_k": 5
+            },
+            "description": "Test search for high risk applications with LLM analysis"
         },
         "department_search": {
-            "query": "Identity Access Management",
-            "top_k": 10
+            "endpoint": "/search",
+            "method": "POST",
+            "body": {
+                "query": "Identity Access Management",
+                "top_k": 10
+            },
+            "description": "Test search by department with LLM analysis"
         },
         "vulnerability_search": {
-            "query": "critical vulnerabilities",
-            "top_k": 3
+            "endpoint": "/search",
+            "method": "POST",
+            "body": {
+                "query": "critical vulnerabilities",
+                "top_k": 3
+            },
+            "description": "Test search for critical vulnerabilities with LLM analysis"
+        },
+        "empty_search_query": {
+            "endpoint": "/search",
+            "method": "POST",
+            "body": {
+                "query": ""
+            },
+            "description": "Test validation for empty search query"
+        },
+        "missing_search_query": {
+            "endpoint": "/search",
+            "method": "POST",
+            "body": {},
+            "description": "Test validation for missing search query"
+        },
+        "health_check": {
+            "endpoint": "/health",
+            "method": "GET",
+            "description": "Test system health status"
+        },
+        "system_stats": {
+            "endpoint": "/stats",
+            "method": "GET",
+            "description": "Test system statistics endpoint"
         }
     },
     "expected_responses": {
         "suggestions_success": {
             "success": true,
             "suggestions": {
-                "ao_information": "object",
-                "security_analysis": "object",
-                "priority_recommendations": "array",
-                "action_items": "object",
-                "compliance_guidance": "object",
-                "comparative_analysis": "object",
-                "risk_mitigation": "object"
+                "status": "ao_found",
+                "match_type": "exact",
+                "ao_profile": {
+                    "ao_name": "string",
+                    "applications": "array",
+                    "department": "string",
+                    "risk_score": "string",
+                    "compliance_score": "string",
+                    "vulnerability_count": "string",
+                    "criticality": "string",
+                    "environment": "string"
+                },
+                "ai_analysis": "string (LLM-generated structured analysis)",
+                "ai_enhanced": true,
+                "generation_timestamp": "string"
+            },
+            "timestamp": "string"
+        },
+        "suggestions_ao_not_found": {
+            "success": true,
+            "suggestions": {
+                "status": "ao_not_found",
+                "searched_ao": "string",
+                "message": "string",
+                "similar_ao_names": "array",
+                "suggestions": "array"
             }
+        },
+        "suggestions_error": {
+            "success": false,
+            "error": "string",
+            "available_aos": "array (when ao_name is missing)"
         },
         "search_success": {
             "success": true,
             "query": "string",
-            "results": "array",
+            "ai_analysis": "string (LLM-generated analysis of search results)",
+            "matching_aos": "array of simplified AO objects",
             "total_found": "number",
+            "ai_enhanced": true,
             "timestamp": "string"
+        },
+        "search_error": {
+            "success": false,
+            "error": "string",
+            "example": {
+                "query": "string"
+            }
         },
         "stats_success": {
             "success": true,
@@ -89,7 +187,8 @@
                 "avg_risk_score": "number",
                 "high_risk_aos": "number",
                 "last_updated": "string"
-            }
+            },
+            "timestamp": "string"
         },
         "health_success": {
             "status": "healthy",
@@ -101,16 +200,49 @@
     "performance_benchmarks": {
         "health_check": "< 200ms",
         "stats": "< 300ms",
-        "search": "< 500ms",
-        "suggestions": "< 3s (with LLM), < 1s (without LLM)"
+        "search": "< 5s (with LLM analysis)",
+        "suggestions": "< 8s (always uses LLM now)"
     },
     "usage_tips": [
         "Always start with a health check to ensure the system is running",
         "Use stats endpoint to get an overview of the data",
-        "Search endpoint is great for finding relevant AOs before detailed analysis",
-        "Suggestions endpoint provides the most comprehensive analysis",
-        "Set use_llm: false for faster responses when AI analysis isn't needed",
-        "Use top_k parameter in search to control the number of results",
-        "Invalid AO names will return helpful suggestions for correction"
-    ]
+        "Search endpoint now provides LLM analysis of matching results",
+        "Suggestions endpoint always uses LLM for comprehensive analysis",
+        "Both search and suggestions now return AI-enhanced responses",
+        "Use top_k parameter in search to control the number of results analyzed",
+        "Invalid AO names will return helpful suggestions for correction",
+        "Responses are now more concise with essential data + LLM analysis",
+        "LLM responses are structured with clear sections for easy reading"
+    ],
+    "example_requests": {
+        "suggestions_request": {
+            "url": "http://localhost:5001/suggestions",
+            "method": "POST",
+            "headers": {
+                "Content-Type": "application/json"
+            },
+            "body": {
+                "ao_name": "Alice Singh"
+            }
+        },
+        "search_request": {
+            "url": "http://localhost:5001/search",
+            "method": "POST",
+            "headers": {
+                "Content-Type": "application/json"
+            },
+            "body": {
+                "query": "high risk applications",
+                "top_k": 5
+            }
+        },
+        "stats_request": {
+            "url": "http://localhost:5001/stats",
+            "method": "GET"
+        },
+        "health_request": {
+            "url": "http://localhost:5001/health",
+            "method": "GET"
+        }
+    }
 }
