@@ -19,6 +19,7 @@ from datetime import datetime
 import json
 import requests
 import logging
+import re
 from typing import Dict, List, Optional, Union
 from functools import lru_cache
 from collections import defaultdict
@@ -74,7 +75,7 @@ class OllamaService:
             }
 
             response = requests.post(
-                Config.OLLAMA_URL, json=payload, timeout=30)
+                Config.OLLAMA_URL, json=payload, timeout=300)
             response.raise_for_status()
 
             data = response.json()
@@ -387,9 +388,16 @@ class AORAGSystem:
                  'high': 0, 'medium': 0, 'low': 0}
 
         for vuln in vulnerabilities:
-            severity = vuln.get('severity', '').lower()
-            if severity in stats:
-                stats[severity] += 1
+            severity = vuln.get('severity', '').lower().strip()
+            # Handle different severity naming conventions
+            if severity in ['critical', 'very high', '5']:
+                stats['critical'] += 1
+            elif severity in ['high', '4']:
+                stats['high'] += 1
+            elif severity in ['medium', 'moderate', '3']:
+                stats['medium'] += 1
+            elif severity in ['low', 'minor', '2', '1']:
+                stats['low'] += 1
 
         return stats
 
@@ -664,6 +672,10 @@ Provide specific, actionable recommendations tailored to this Application Owner'
         llm_response = OllamaService.query_ollama(
             suggestions_prompt, temperature=0.6)
 
+        # Format the LLM response into structured JSON
+        structured_analysis = ResponseFormatter.format_suggestions_analysis(
+            llm_response)
+
         response = {
             "status": "ao_found",
             "match_type": target_ao.get('match_type', 'exact'),
@@ -677,7 +689,7 @@ Provide specific, actionable recommendations tailored to this Application Owner'
                 "criticality": target_ao['criticality'],
                 "environment": target_ao['environment']
             },
-            "ai_analysis": llm_response,
+            "ai_analysis": structured_analysis,
             "ai_enhanced": True,
             "generation_timestamp": datetime.now().isoformat()
         }
@@ -1371,7 +1383,12 @@ def search_aos():
         results = rag_system.search_aos(query, top_k)
 
         # Generate LLM analysis
-        llm_analysis = rag_system.generate_llm_search_analysis(query, results)
+        raw_llm_analysis = rag_system.generate_llm_search_analysis(
+            query, results)
+
+        # Format the LLM analysis into structured JSON
+        structured_analysis = ResponseFormatter.format_search_analysis(
+            raw_llm_analysis)
 
         # Simplified result format with essential data
         simplified_results = []
@@ -1392,7 +1409,7 @@ def search_aos():
         return jsonify({
             "success": True,
             "query": query,
-            "ai_analysis": llm_analysis,
+            "ai_analysis": structured_analysis,
             "matching_aos": simplified_results,
             "total_found": len(results),
             "ai_enhanced": True,
@@ -1475,27 +1492,315 @@ def internal_error(error):
     }), 500
 
 
-if __name__ == '__main__':
-    print("\n" + "="*80)
-    print("🚀 OPTIMIZED AO RAG API - VERSION 2.0")
-    print("="*80)
-    print("🎯 Key Optimizations:")
-    print("   ✅ Fixed column mapping for Excel data")
-    print("   ✅ Enhanced error handling and validation")
-    print("   ✅ Improved caching and performance")
-    print("   ✅ Better code organization")
-    print("   ✅ Enhanced AI integration")
-    print("="*80)
-    print("📋 Available Endpoints:")
-    print("   POST /suggestions  - Get detailed AO suggestions")
-    print("   POST /search       - Search AOs by query")
-    print("   GET  /stats        - System statistics")
-    print("   GET  /health       - Health check")
-    print("="*80)
-    print("💡 Example Usage:")
-    print("   curl -X POST http://localhost:5001/suggestions \\")
-    print("        -H 'Content-Type: application/json' \\")
-    print("        -d '{\"ao_name\": \"Alice Singh\", \"use_llm\": true}'")
-    print("="*80)
+class ResponseFormatter:
+    """Format and structure LLM responses into proper JSON format"""
 
-    app.run(debug=True, host='0.0.0.0', port=5001)
+    @staticmethod
+    def format_search_analysis(raw_ai_response: str) -> Dict:
+        """Convert raw LLM search analysis into structured JSON"""
+        try:
+            structured_response = {
+                "search_summary": "",
+                "key_findings": [],
+                "risk_analysis": "",
+                "priority_attention": [],
+                "recommended_actions": [],
+                "comparative_insights": "",
+                "additional_notes": ""
+            }
+
+            # Split by section headers
+            sections = ResponseFormatter._split_into_sections(raw_ai_response)
+
+            # Extract search summary
+            if "search summary" in sections:
+                structured_response["search_summary"] = ResponseFormatter._clean_text(
+                    sections["search summary"]
+                )
+
+            # Extract key findings
+            if "key findings" in sections:
+                findings_text = sections["key findings"]
+                structured_response["key_findings"] = ResponseFormatter._extract_bullet_points(
+                    findings_text
+                )
+
+            # Extract risk analysis
+            if "risk analysis" in sections:
+                structured_response["risk_analysis"] = ResponseFormatter._clean_text(
+                    sections["risk analysis"]
+                )
+
+            # Extract priority attention
+            if "priority attention" in sections:
+                priority_text = sections["priority attention"]
+                structured_response["priority_attention"] = ResponseFormatter._extract_priority_items(
+                    priority_text
+                )
+
+            # Extract recommended actions
+            if "recommended actions" in sections:
+                actions_text = sections["recommended actions"]
+                structured_response["recommended_actions"] = ResponseFormatter._extract_bullet_points(
+                    actions_text
+                )
+
+            # Extract comparative insights
+            if "comparative insights" in sections:
+                structured_response["comparative_insights"] = ResponseFormatter._clean_text(
+                    sections["comparative insights"]
+                )
+
+            return structured_response
+
+        except Exception as e:
+            logger.error(f"Error formatting search analysis: {e}")
+            return {
+                "search_summary": "Analysis formatting error",
+                "key_findings": ["Error parsing LLM response"],
+                "risk_analysis": raw_ai_response[:500] + "..." if len(raw_ai_response) > 500 else raw_ai_response,
+                "priority_attention": [],
+                "recommended_actions": [],
+                "comparative_insights": "",
+                "error": str(e)
+            }
+
+    @staticmethod
+    def format_suggestions_analysis(raw_ai_response: str) -> Dict:
+        """Convert raw LLM suggestions analysis into structured JSON"""
+        try:
+            structured_response = {
+                "executive_summary": "",
+                "critical_findings": [],
+                "risk_assessment": "",
+                "immediate_actions": [],
+                "short_term_goals": [],
+                "long_term_strategy": [],
+                "compliance_recommendations": [],
+                "comparative_analysis": "",
+                "additional_recommendations": []
+            }
+
+            # Split by section headers
+            sections = ResponseFormatter._split_into_sections(raw_ai_response)
+
+            # Extract executive summary
+            if "executive summary" in sections:
+                structured_response["executive_summary"] = ResponseFormatter._clean_text(
+                    sections["executive summary"]
+                )
+
+            # Extract critical findings
+            if "critical findings" in sections:
+                findings_text = sections["critical findings"]
+                structured_response["critical_findings"] = ResponseFormatter._extract_bullet_points(
+                    findings_text
+                )
+
+            # Extract risk assessment
+            if "risk assessment" in sections:
+                structured_response["risk_assessment"] = ResponseFormatter._clean_text(
+                    sections["risk assessment"]
+                )
+
+            # Extract immediate actions
+            if "immediate actions" in sections:
+                actions_text = sections["immediate actions"]
+                structured_response["immediate_actions"] = ResponseFormatter._extract_action_items(
+                    actions_text
+                )
+
+            # Extract short-term goals
+            if "short-term goals" in sections or "short term goals" in sections:
+                key = "short-term goals" if "short-term goals" in sections else "short term goals"
+                goals_text = sections[key]
+                structured_response["short_term_goals"] = ResponseFormatter._extract_action_items(
+                    goals_text
+                )
+
+            # Extract long-term strategy
+            if "long-term strategy" in sections or "long term strategy" in sections:
+                key = "long-term strategy" if "long-term strategy" in sections else "long term strategy"
+                strategy_text = sections[key]
+                structured_response["long_term_strategy"] = ResponseFormatter._extract_action_items(
+                    strategy_text
+                )
+
+            # Extract compliance recommendations
+            if "compliance recommendations" in sections:
+                compliance_text = sections["compliance recommendations"]
+                structured_response["compliance_recommendations"] = ResponseFormatter._extract_bullet_points(
+                    compliance_text
+                )
+
+            # Extract comparative analysis
+            if "comparative analysis" in sections:
+                structured_response["comparative_analysis"] = ResponseFormatter._clean_text(
+                    sections["comparative analysis"]
+                )
+
+            return structured_response
+
+        except Exception as e:
+            logger.error(f"Error formatting suggestions analysis: {e}")
+            return {
+                "executive_summary": "Analysis formatting error",
+                "critical_findings": ["Error parsing LLM response"],
+                "risk_assessment": raw_ai_response[:500] + "..." if len(raw_ai_response) > 500 else raw_ai_response,
+                "immediate_actions": [],
+                "short_term_goals": [],
+                "long_term_strategy": [],
+                "compliance_recommendations": [],
+                "comparative_analysis": "",
+                "error": str(e)
+            }
+
+    @staticmethod
+    def _split_into_sections(text: str) -> Dict[str, str]:
+        """Split text into sections based on markdown headers"""
+        sections = {}
+        current_section = ""
+        current_content = []
+
+        lines = text.split('\n')
+
+        for line in lines:
+            line = line.strip()
+
+            # Check if line is a section header (starts with ** and ends with **)
+            if line.startswith('**') and line.endswith('**') and len(line) > 4:
+                # Save previous section
+                if current_section:
+                    sections[current_section.lower()] = '\n'.join(
+                        current_content).strip()
+
+                # Start new section
+                current_section = line.strip('*').strip()
+                current_content = []
+            else:
+                # Add content to current section
+                if line:  # Skip empty lines
+                    current_content.append(line)
+
+        # Save last section
+        if current_section:
+            sections[current_section.lower()] = '\n'.join(
+                current_content).strip()
+
+        return sections
+
+    @staticmethod
+    def _extract_bullet_points(text: str) -> List[str]:
+        """Extract bullet points from text"""
+        points = []
+        lines = text.split('\n')
+
+        for line in lines:
+            line = line.strip()
+            # Look for bullet points (*, -, •, or numbered lists)
+            if re.match(r'^[\*\-\•]\s+', line) or re.match(r'^\d+\.\s+', line):
+                # Remove bullet/number and clean
+                clean_point = re.sub(r'^[\*\-\•]\s+', '', line)
+                clean_point = re.sub(r'^\d+\.\s+', '', clean_point)
+                if clean_point:
+                    points.append(clean_point.strip())
+            elif line and not re.match(r'^\**[A-Z\s]+\**$', line):  # Not a header
+                # Add as regular text if it's not empty and not a header
+                if line:
+                    points.append(line.strip())
+
+        return points[:10]  # Limit to 10 items
+
+    @staticmethod
+    def _extract_action_items(text: str) -> List[Dict]:
+        """Extract action items with priority and timeline"""
+        actions = []
+        lines = text.split('\n')
+
+        for line in lines:
+            line = line.strip()
+            if line and (line.startswith('*') or line.startswith('-') or line.startswith('•') or re.match(r'^\d+\.', line)):
+                # Clean the line
+                clean_action = re.sub(r'^[\*\-\•]\s+', '', line)
+                clean_action = re.sub(r'^\d+\.\s+', '', clean_action)
+
+                if clean_action:
+                    # Try to extract timeline if present
+                    timeline_match = re.search(
+                        r'\(([^)]*(?:week|month|day)[^)]*)\)', clean_action)
+                    timeline = timeline_match.group(
+                        1) if timeline_match else "As soon as possible"
+
+                    # Remove timeline from action text
+                    action_text = re.sub(
+                        r'\([^)]*(?:week|month|day)[^)]*\)', '', clean_action).strip()
+
+                    # Determine priority based on keywords
+                    priority = "Medium"
+                    if any(word in action_text.lower() for word in ['urgent', 'immediate', 'critical', 'emergency']):
+                        priority = "High"
+                    elif any(word in action_text.lower() for word in ['long-term', 'future', 'eventually']):
+                        priority = "Low"
+
+                    actions.append({
+                        "action": action_text,
+                        "priority": priority,
+                        "timeline": timeline,
+                        "category": ResponseFormatter._categorize_action(action_text)
+                    })
+
+        return actions[:8]  # Limit to 8 actions
+
+    @staticmethod
+    def _extract_priority_items(text: str) -> List[Dict]:
+        """Extract priority items with details"""
+        priority_items = []
+        lines = text.split('\n')
+
+        for line in lines:
+            line = line.strip()
+            if line and ('risk score' in line.lower() or 'ao' in line.lower() or 'application owner' in line.lower()):
+                # Extract AO name if present
+                ao_match = re.search(r'([A-Z][a-z]+ [A-Z][a-z]+)', line)
+                ao_name = ao_match.group(1) if ao_match else "Unknown"
+
+                # Extract risk score if present
+                risk_match = re.search(
+                    r'risk score[:\s]*([0-9\.]+)', line.lower())
+                risk_score = risk_match.group(1) if risk_match else "Unknown"
+
+                priority_items.append({
+                    "ao_name": ao_name,
+                    "risk_score": risk_score,
+                    "reason": line,
+                    "urgency": "High" if (risk_score != "Unknown" and float(risk_score) > 4) else "Medium"
+                })
+
+        return priority_items[:5]  # Limit to 5 priority items
+
+    @staticmethod
+    def _categorize_action(action_text: str) -> str:
+        """Categorize action based on content"""
+        action_lower = action_text.lower()
+
+        if any(word in action_lower for word in ['vulnerabilit', 'patch', 'security']):
+            return "Security"
+        elif any(word in action_lower for word in ['compliance', 'audit', 'regulatory']):
+            return "Compliance"
+        elif any(word in action_lower for word in ['training', 'awareness', 'education']):
+            return "Training"
+        elif any(word in action_lower for word in ['monitoring', 'assess', 'review']):
+            return "Monitoring"
+        else:
+            return "General"
+
+    @staticmethod
+    def _clean_text(text: str) -> str:
+        """Clean and format text content"""
+        # Remove excessive whitespace
+        text = re.sub(r'\s+', ' ', text)
+        # Remove markdown formatting
+        text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
+        text = re.sub(r'\*([^*]+)\*', r'\1', text)
+        # Clean up
+        return text.strip()
