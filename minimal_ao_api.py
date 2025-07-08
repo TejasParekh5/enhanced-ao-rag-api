@@ -36,7 +36,7 @@ app = Flask(__name__)
 
 class Config:
     OLLAMA_URL = "http://localhost:11434/api/generate"
-    DEFAULT_MODEL = "llama3.1:8b"
+    DEFAULT_MODEL = "llama3.2:1b"
     EXCEL_FILE = "Cybersecurity_KPI_Minimal.xlsx"
     DATA_FILE = "ao_rag_data.pkl"
     INDEX_FILE = "ao_rag_faiss.index"
@@ -1804,3 +1804,38 @@ class ResponseFormatter:
         text = re.sub(r'\*([^*]+)\*', r'\1', text)
         # Clean up
         return text.strip()
+
+
+# Main execution
+if __name__ == "__main__":
+    try:
+        if rag_system is None:
+            print("❌ RAG system failed to initialize. Please check:")
+            print("1. Excel file 'Cybersecurity_KPI_Minimal.xlsx' exists")
+            print("2. Required dependencies are installed")
+            print("3. Sufficient memory available")
+            exit(1)
+
+        print("🚀 Starting AO RAG API Server...")
+        print(f"📊 System Stats: {rag_system.get_system_stats()}")
+        print("📍 API Endpoints:")
+        print("   POST /suggestions - Get AO-specific suggestions")
+        print("   POST /search - Search AOs by query")
+        print("   GET /stats - System statistics")
+        print("   GET /health - Health check")
+        print("\n🌐 Server starting on http://localhost:5001")
+        print("📋 Test with Postman or curl commands")
+
+        # Run Flask app
+        app.run(
+            host='0.0.0.0',
+            port=5001,
+            debug=False,  # Set to False for production
+            threaded=True
+        )
+
+    except KeyboardInterrupt:
+        print("\n⏹️ Server stopped by user")
+    except Exception as e:
+        logger.error(f"Failed to start server: {e}")
+        print(f"❌ Server startup failed: {e}")

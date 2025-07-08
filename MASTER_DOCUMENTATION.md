@@ -14,17 +14,18 @@
 4. [Data Processing Pipeline](#4-data-processing-pipeline)
 5. [API Endpoints Detailed](#5-api-endpoints-detailed)
 6. [Function Documentation](#6-function-documentation)
-7. [Installation & Setup](#7-installation--setup)
-8. [Usage Examples](#8-usage-examples)
-9. [Microsoft Server Integration](#9-microsoft-server-integration)
-10. [.NET Integration Strategies](#10-net-integration-strategies)
-11. [Deployment Options](#11-deployment-options)
-12. [Security Considerations](#12-security-considerations)
-13. [Performance Optimization](#13-performance-optimization)
-14. [Testing & Validation](#14-testing--validation)
-15. [Troubleshooting](#15-troubleshooting)
-16. [Migration Roadmap](#16-migration-roadmap)
-17. [File Structure](#17-file-structure)
+7. [Calculation Formulas and Standards](#7-calculation-formulas-and-standards)
+8. [Installation & Setup](#8-installation--setup)
+9. [Usage Examples](#9-usage-examples)
+10. [Microsoft Server Integration](#10-microsoft-server-integration)
+11. [.NET Integration Strategies](#11-net-integration-strategies)
+12. [Deployment Options](#12-deployment-options)
+13. [Security Considerations](#13-security-considerations)
+14. [Performance Optimization](#14-performance-optimization)
+15. [Testing & Validation](#15-testing--validation)
+16. [Troubleshooting](#16-troubleshooting)
+17. [Migration Roadmap](#17-migration-roadmap)
+18. [File Structure](#18-file-structure)
 
 ---
 
@@ -575,55 +576,42 @@ class Config:
     # Ollama LLM Configuration
     OLLAMA_URL = "http://localhost:11434/api/generate"
     DEFAULT_MODEL = "llama3.2:1b"
-    OLLAMA_TIMEOUT = 30  # seconds
 
     # Data Source Configuration
     EXCEL_FILE = "Cybersecurity_KPI_Minimal.xlsx"
-    CACHE_FILE = "ao_rag_data.pkl"
-    FAISS_INDEX_FILE = "ao_rag_faiss.index"
+    DATA_FILE = "ao_rag_data.pkl"
+    INDEX_FILE = "ao_rag_faiss.index"
 
-    # Performance Configuration
-    LRU_CACHE_SIZE = 100
-    SEARCH_CACHE_SIZE = 50
-    BATCH_SIZE = 32
-
-    # Column Mapping for Excel Processing
+    # Column mapping - maps our internal names to Excel column names
     COLUMN_MAPPING = {
-        'Application Owner Name': 'ao_name',
-        'Application Name': 'application_name',
-        'Asset Name': 'asset_name',
-        'Risk Level': 'risk_level',
-        'Department': 'department',
-        'Environment': 'environment',
-        'Criticality': 'criticality',
-        'Vulnerability Count': 'vulnerability_count',
-        'High Vulnerabilities': 'high_vulnerabilities',
-        'Medium Vulnerabilities': 'medium_vulnerabilities',
-        'Low Vulnerabilities': 'low_vulnerabilities',
-        'Critical Vulnerabilities': 'critical_vulnerabilities'
+        'ao_name': 'Application_Owner_Name',
+        'application': 'Application_Name',
+        'department': 'Dept_Name',
+        'risk_score': 'Risk_Score',
+        'severity': 'Severity',
+        'cvss_score': 'CVSS_Score',
+        'vulnerability_desc': 'Vulnerability_Description',
+        'asset_name': 'Asset_Name',
+        'asset_type': 'Asset_Type',
+        'status': 'Status',
+        'first_detected': 'First_Detected_Date',
+        'closure_date': 'Closure_Date',
+        'days_to_close': 'Days_to_Close'
     }
-
-    # AI Analysis Configuration
-    DEFAULT_TEMPERATURE = 0.7
-    MAX_SEARCH_RESULTS = 20
-    DEFAULT_SEARCH_RESULTS = 5
-
-    # System Configuration
-    API_VERSION = "2.1-structured-output"
-    DEBUG_MODE = False
 ```
 
 **Purpose:** Centralized configuration management for the entire application.
 
 **Key Components:**
 
-- **LLM Settings:** Ollama URL, model selection, timeout configuration
-- **Data Management:** File paths for Excel data, cache, and FAISS index
-- **Performance Tuning:** Cache sizes, batch processing settings
-- **Column Mapping:** Excel-to-internal field name translations
-- **API Settings:** Version, default parameters, response limits
+- **LLM Settings:** Ollama URL and model selection for Llama 3.2 1B integration
+- **Data Management:** File paths for Excel data, processed cache, and FAISS index
+- **Column Mapping:** Maps Excel column names to internal field names for data processing
+- **System Configuration:** Core application settings and parameters
 
 ### 6.2. OllamaService Class
+
+The OllamaService class provides robust integration with the Llama 3.2 1B model through Ollama, featuring intelligent caching, error handling, and fallback mechanisms.
 
 #### `query_ollama(prompt, temperature, model)`
 
@@ -639,15 +627,22 @@ def query_ollama(prompt: str, temperature: float = 0.7, model: str = Config.DEFA
 
 - `prompt` (str): The question or instruction to send to the AI
 - `temperature` (float): Controls AI creativity (0.0 = deterministic, 1.0 = creative)
-- `model` (str): Which AI model to use
+- `model` (str): Which AI model to use (default: llama3.2:1b)
 
 **Return Value:** AI-generated response as a string
 
 **Key Features:**
 
-- @lru_cache(maxsize=100): Caches responses to avoid repeated API calls
-- Error Handling: Gracefully handles connection errors, timeouts, and service unavailability
-- Timeout Management: 30-second timeout to prevent hanging requests
+- **LRU Caching:** Caches the 100 most recent responses to avoid repeated API calls
+- **Error Handling:** Gracefully handles connection errors, timeouts, and service unavailability
+- **Timeout Management:** Built-in request timeout to prevent hanging requests
+- **Fallback Response:** Returns informative error messages when LLM is unavailable
+
+**Error Handling:**
+
+- `ConnectionError`: Returns "AI analysis unavailable - Ollama service not running"
+- `Timeout`: Returns "AI analysis timeout - please try again"
+- `General Exception`: Returns descriptive error message with the specific error
 
 #### `enhance_ao_response(query, ao_context)`
 
@@ -656,287 +651,134 @@ def query_ollama(prompt: str, temperature: float = 0.7, model: str = Config.DEFA
 def enhance_ao_response(query: str, ao_context: str) -> str
 ```
 
-**Purpose:** Enhances Application Owner security data with AI-powered analysis.
+**Purpose:** Enhances Application Owner security data with comprehensive AI-powered analysis.
 
 **Parameters:**
 
-- `query` (str): User's original question
+- `query` (str): User's original question or analysis request
 - `ao_context` (str): Formatted security data about the Application Owner
 
-**Return Value:** AI-enhanced analysis and recommendations
+**Return Value:** AI-enhanced analysis with structured recommendations
 
-**Advanced Error Handling:**
+**Advanced Prompt Engineering:**
+The function creates specialized prompts for cybersecurity analysis that include:
 
-```python
-@staticmethod
-def enhance_ao_response(query: str, ao_context: str) -> str:
-    """
-    Enhanced AO response with comprehensive error handling
-    """
-    try:
-        # Validate inputs
-        if not query or not query.strip():
-            raise ValueError("Query cannot be empty")
-        if not ao_context or not ao_context.strip():
-            raise ValueError("AO context cannot be empty")
+1. Executive summary of security posture
+2. Critical security issues identification
+3. Risk assessment and prioritization
+4. Actionable recommendations with timelines
+5. Compliance status evaluation
+6. Industry best practices recommendations
 
-        # Create comprehensive prompt
-        prompt = f"""
-        Analyze the following Application Owner security data and provide structured recommendations:
-
-        Query: {query}
-
-        Security Context:
-        {ao_context}
-
-        Please provide a comprehensive analysis with:
-        1. Executive Summary
-        2. Critical Findings
-        3. Risk Assessment
-        4. Immediate Actions (with priorities and timelines)
-        5. Short-term Goals (1-3 months)
-        6. Long-term Strategy (3-12 months)
-        7. Compliance Recommendations
-        8. Comparative Analysis
-        """
-
-        # Query LLM with error handling
-        try:
-            response = OllamaService.query_ollama(prompt, temperature=0.7)
-            if not response or len(response.strip()) < 50:
-                raise ValueError("LLM response too short or empty")
-            return response
-
-        except requests.exceptions.ConnectionError:
-            logger.warning("LLM service unavailable, returning fallback response")
-            return OllamaService._generate_fallback_response(query, ao_context)
-
-        except requests.exceptions.Timeout:
-            logger.warning("LLM request timeout, returning fallback response")
-            return OllamaService._generate_fallback_response(query, ao_context)
-
-        except Exception as llm_error:
-            logger.error(f"LLM query failed: {llm_error}")
-            return OllamaService._generate_fallback_response(query, ao_context)
-
-    except ValueError as ve:
-        logger.error(f"Input validation error: {ve}")
-        return f"Error: {ve}"
-
-    except Exception as e:
-        logger.error(f"Unexpected error in enhance_ao_response: {e}")
-        return "An unexpected error occurred while generating recommendations."
-
-@staticmethod
-def _generate_fallback_response(query: str, ao_context: str) -> str:
-    """Generate fallback response when LLM is unavailable"""
-    return f"""
-    # Security Analysis Report
-
-    **Note:** This is a fallback analysis as the AI enhancement service is currently unavailable.
-
-    ## Executive Summary
-    Based on the provided security data, this Application Owner requires attention in several key areas.
-
-    ## Critical Findings
-    - Review the security metrics provided
-    - Assess vulnerability counts and risk levels
-    - Evaluate compliance status
-
-    ## Immediate Actions
-    - Conduct security assessment of high-risk applications
-    - Address any critical vulnerabilities
-    - Implement monitoring for key security metrics
-
-    ## Recommendations
-    - Regular security reviews
-    - Vulnerability management program
-    - Compliance monitoring
-
-    **For detailed AI-enhanced analysis, please ensure the Ollama service is running and try again.**
-    """
-```
-
-### 6.2.1. Comprehensive Error Handling Patterns
-
-```python
-# Pattern 1: Graceful Degradation
-def get_suggestions(self, ao_name: str, use_llm: bool = False) -> Dict:
-    """Main suggestions endpoint with error handling"""
-    try:
-        # Primary functionality
-        ao_data = self._find_ao_data(ao_name)
-        if not ao_data:
-            return {
-                'success': False,
-                'error': 'AO_NOT_FOUND',
-                'message': f"Application Owner '{ao_name}' not found",
-                'suggestions': []
-            }
-
-        # Generate suggestions with fallback
-        suggestions = self._generate_suggestions(ao_data, use_llm)
-        return {
-            'success': True,
-            'suggestions': suggestions,
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        }
-
-    except Exception as e:
-        logger.error(f"Error in get_suggestions: {e}")
-        return {
-            'success': False,
-            'error': 'INTERNAL_ERROR',
-            'message': 'An internal error occurred',
-            'suggestions': []
-        }
-
-# Pattern 2: Retry Logic with Exponential Backoff
-def _query_with_retry(self, prompt: str, max_retries: int = 3) -> str:
-    """Query with exponential backoff retry"""
-    for attempt in range(max_retries):
-        try:
-            return self.query_ollama(prompt)
-        except requests.exceptions.ConnectionError:
-            if attempt < max_retries - 1:
-                wait_time = 2 ** attempt  # Exponential backoff
-                logger.warning(f"Connection failed, retrying in {wait_time}s...")
-                time.sleep(wait_time)
-            else:
-                raise
-        except Exception as e:
-            logger.error(f"Query attempt {attempt + 1} failed: {e}")
-            if attempt == max_retries - 1:
-                raise
-
-# Pattern 3: Input Validation and Sanitization
-def _validate_search_input(self, query: str, top_k: int) -> tuple:
-    """Validate and sanitize search inputs"""
-    # Query validation
-    if not query or not isinstance(query, str):
-        raise ValueError("Query must be a non-empty string")
-
-    query = query.strip()
-    if len(query) < 2:
-        raise ValueError("Query must be at least 2 characters long")
-
-    if len(query) > 500:
-        query = query[:500]  # Truncate long queries
-        logger.warning("Query truncated to 500 characters")
-
-    # Top_k validation
-    if not isinstance(top_k, int) or top_k < 1:
-        raise ValueError("top_k must be a positive integer")
-
-    top_k = min(top_k, Config.MAX_SEARCH_RESULTS)  # Enforce maximum
-
-    return query, top_k
-
-# Pattern 4: Resource Management
-class ResourceManager:
-    """Context manager for resource cleanup"""
-
-    def __init__(self, resources: List[Any]):
-        self.resources = resources
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        for resource in self.resources:
-            try:
-                if hasattr(resource, 'close'):
-                    resource.close()
-            except Exception as e:
-                logger.error(f"Error closing resource: {e}")
-```
-
-### 6.2.2. Error Response Standardization
-
-```python
-# Standardized error response format
-def create_error_response(error_code: str, message: str, details: Dict = None) -> Dict:
-    """Create standardized error response"""
-    response = {
-        'success': False,
-        'error': error_code,
-        'message': message,
-        'timestamp': datetime.utcnow().isoformat() + 'Z'
-    }
-
-    if details:
-        response['details'] = details
-
-    return response
-
-# Common error codes and handlers
-ERROR_CODES = {
-    'AO_NOT_FOUND': 'Application Owner not found',
-    'INVALID_INPUT': 'Invalid input parameters',
-    'LLM_UNAVAILABLE': 'AI enhancement service unavailable',
-    'CACHE_ERROR': 'Cache operation failed',
-    'SYSTEM_NOT_INITIALIZED': 'System not properly initialized',
-    'RATE_LIMIT_EXCEEDED': 'Too many requests',
-    'INTERNAL_ERROR': 'Internal server error'
-}
-```
-
-### 6.3. ResponseFormatter Class
-
-#### `format_search_analysis(raw_ai_response)`
+#### `analyze_vulnerability(vulnerability_name, code_snippet, risk_rating, description)`
 
 ```python
 @staticmethod
-def format_search_analysis(raw_ai_response: str) -> Dict
+def analyze_vulnerability(vulnerability_name: str, code_snippet: str = "",
+                         risk_rating: str = "", description: str = "") -> str
 ```
 
-**Purpose:** Convert raw LLM search analysis into structured JSON.
+**Purpose:** Provides detailed vulnerability analysis with OWASP categorization.
 
-**Return Value:** Dictionary with structured sections:
+**Parameters:**
 
-- `search_summary`: String overview
-- `key_findings`: Array of insights
-- `risk_analysis`: String analysis
-- `priority_attention`: Array of priority items
-- `recommended_actions`: Array of actions
-- `comparative_insights`: String insights
+- `vulnerability_name` (str): Name/identifier of the vulnerability
+- `code_snippet` (str, optional): Code sample for analysis
+- `risk_rating` (str, optional): Current risk assessment
+- `description` (str, optional): Vulnerability description
 
-#### `format_suggestions_analysis(raw_ai_response)`
+**Return Value:** Comprehensive vulnerability analysis including:
+
+- OWASP Top 10 classification
+- Risk level assessment
+- Common attack vectors
+- Specific mitigation recommendations
+- Code-level fixes (when applicable)
+
+### 6.3. DataProcessor Class
+
+The DataProcessor class provides optimized data handling and calculation utilities with comprehensive error handling.
+
+#### `safe_convert(value, convert_func, default)`
 
 ```python
 @staticmethod
-def format_suggestions_analysis(raw_ai_response: str) -> Dict
+def safe_convert(value, convert_func, default=0):
 ```
 
-**Purpose:** Convert raw LLM suggestions analysis into structured JSON.
+**Purpose:** Safely converts values with fallback handling for malformed data.
 
-**Return Value:** Dictionary with structured sections:
+**Parameters:**
 
-- `executive_summary`: String summary
-- `critical_findings`: Array of findings
-- `risk_assessment`: String assessment
-- `immediate_actions`: Array of action objects
-- `short_term_goals`: Array of goal objects
-- `long_term_strategy`: Array of strategy objects
-- `compliance_recommendations`: Array of recommendations
+- `value`: The value to convert
+- `convert_func`: Function to use for conversion (e.g., int, float)
+- `default`: Default value if conversion fails
 
-#### `_extract_action_items(text)`
+**Return Value:** Converted value or default if conversion fails
+
+**Use Cases:**
+
+- Converting risk scores from Excel to float
+- Handling empty cells in vulnerability counts
+- Processing dates and timestamps safely
+
+#### `calculate_vulnerability_stats(df_group)`
 
 ```python
 @staticmethod
-def _extract_action_items(text: str) -> List[Dict]
+def calculate_vulnerability_stats(df_group: pd.DataFrame) -> Dict
 ```
 
-**Purpose:** Extract action items with priority and timeline from text.
+**Purpose:** Calculates comprehensive vulnerability statistics for an AO group.
 
-**Return Value:** List of action dictionaries with:
+**Parameters:**
 
-- `action`: String description
-- `priority`: "High", "Medium", or "Low"
-- `timeline`: Extracted timeline or default
-- `category`: "Security", "Compliance", "Training", "Monitoring", or "General"
+- `df_group` (pd.DataFrame): Grouped DataFrame for a specific Application Owner
+
+**Return Value:** Dictionary containing:
+
+- `total_vulnerabilities`: Total count
+- `critical_vulnerabilities`: Critical severity count
+- `high_vulnerabilities`: High severity count
+- `medium_vulnerabilities`: Medium severity count
+- `low_vulnerabilities`: Low severity count
+
+#### `calculate_risk_metrics(df_group)`
+
+```python
+@staticmethod
+def calculate_risk_metrics(df_group: pd.DataFrame) -> Dict
+```
+
+**Purpose:** Calculates comprehensive risk metrics for performance analysis.
+
+**Return Value:** Dictionary containing:
+
+- `avg_risk_score`: Average risk score across all entries
+- `max_risk_score`: Maximum risk score found
+- `avg_cvss_score`: Average CVSS score
+- `risk_score_count`: Number of valid risk scores
 
 ### 6.4. AORAGSystem Class
+
+The AORAGSystem class is the core engine that orchestrates data processing, embedding generation, and semantic search operations.
+
+#### `__init__(excel_file_path)`
+
+```python
+def __init__(self, excel_file_path: str = Config.EXCEL_FILE):
+```
+
+**Purpose:** Initializes the RAG system with intelligent caching and data processing.
+
+**Initialization Process:**
+
+1. **Model Loading:** Loads sentence transformer model (all-MiniLM-L6-v2)
+2. **Cache Check:** Attempts to load processed data from cache
+3. **Data Processing:** If cache miss, processes Excel data from scratch
+4. **Embedding Generation:** Creates vector embeddings for semantic search
+5. **Index Building:** Constructs optimized FAISS search index
+6. **Cache Storage:** Saves processed data for future quick loading
 
 #### `search_aos(query, top_k)`
 
@@ -945,7 +787,7 @@ def _extract_action_items(text: str) -> List[Dict]
 def search_aos(self, query: str, top_k: int = 5) -> List[Dict]
 ```
 
-**Purpose:** Performs semantic search to find relevant Application Owners using advanced similarity algorithms.
+**Purpose:** Performs advanced semantic search with multi-stage ranking.
 
 **Parameters:**
 
@@ -954,100 +796,22 @@ def search_aos(self, query: str, top_k: int = 5) -> List[Dict]
 
 **Return Value:** List of AO profiles ranked by similarity score
 
-**Detailed Algorithm:**
+**Advanced Algorithm:**
 
-```python
-def search_aos(self, query: str, top_k: int = 5) -> List[Dict]:
-    """
-    Advanced semantic search with multi-stage ranking
+1. **Query Embedding:** Converts search query to 384-dimensional vector
+2. **Vector Search:** Uses FAISS IndexFlatIP for efficient similarity search
+3. **Score Normalization:** Converts raw scores to interpretable 0-1 range
+4. **Business Logic Enhancement:** Applies relevance boosting based on:
+   - Risk score alignment with query terms
+   - Compliance score relevance
+   - Criticality level matching
+5. **Final Ranking:** Sorts results by combined similarity and relevance scores
 
-    Process:
-    1. Query Embedding: Convert search query to 384-dimensional vector
-    2. Vector Search: Use FAISS for efficient similarity search
-    3. Score Normalization: Convert distances to similarity scores
-    4. Multi-factor Ranking: Combine semantic similarity with relevance factors
-    5. Result Filtering: Apply business logic filters
-    """
+**Performance Features:**
 
-    # Step 1: Generate query embedding
-    query_embedding = self.model.encode([query], convert_to_tensor=False)
-    query_vector = np.array(query_embedding).astype('float32')
-
-    # Step 2: FAISS similarity search
-    # IndexFlatIP uses inner product (cosine similarity for normalized vectors)
-    k = min(top_k * 2, len(self.ao_data))  # Search more to allow filtering
-    scores, indices = self.index.search(query_vector, k)
-
-    # Step 3: Convert to similarity scores
-    # FAISS returns distances, convert to 0-1 similarity scores
-    similarities = 1 / (1 + np.exp(-scores.flatten()))  # Sigmoid normalization
-
-    # Step 4: Enhance with business logic scoring
-    results = []
-    for idx, (faiss_idx, base_similarity) in enumerate(zip(indices.flatten(), similarities)):
-        if faiss_idx >= 0 and faiss_idx < len(self.ao_list):
-            ao_data = self.ao_data[self.ao_list[faiss_idx]]
-
-            # Multi-factor relevance scoring
-            relevance_boost = self._calculate_relevance_boost(ao_data, query)
-            final_similarity = min(1.0, base_similarity * relevance_boost)
-
-            result = {
-                **ao_data,
-                'similarity_score': round(final_similarity, 3),
-                'rank': idx + 1,
-                'search_factors': {
-                    'semantic_similarity': round(base_similarity, 3),
-                    'relevance_boost': round(relevance_boost, 3)
-                }
-            }
-            results.append(result)
-
-    # Step 5: Final ranking and filtering
-    results.sort(key=lambda x: x['similarity_score'], reverse=True)
-    return results[:top_k]
-
-def _calculate_relevance_boost(self, ao_data: Dict, query: str) -> float:
-    """Calculate relevance boost based on business factors"""
-    boost = 1.0
-    query_lower = query.lower()
-
-    # Boost for risk-related queries
-    if any(term in query_lower for term in ['risk', 'vulnerability', 'critical']):
-        risk_score = float(ao_data.get('risk_score', 0))
-        if risk_score > 7:
-            boost *= 1.3  # High risk boost
-        elif risk_score > 5:
-            boost *= 1.1  # Medium risk boost
-
-    # Boost for compliance-related queries
-    if any(term in query_lower for term in ['compliance', 'audit', 'standards']):
-        compliance_score = float(ao_data.get('compliance_score', 100))
-        if compliance_score < 70:
-            boost *= 1.2  # Low compliance boost
-
-    # Boost for criticality matches
-    criticality = ao_data.get('criticality', '').lower()
-    if criticality in query_lower:
-        boost *= 1.15
-
-    return boost
-```
-
-**Key Features:**
-
-- **@lru_cache(maxsize=50):** Caches search results for identical queries
-- **Semantic Similarity:** Uses sentence transformer embeddings for meaning-based matching
-- **FAISS Optimization:** High-performance vector search with IndexFlatIP
-- **Multi-stage Ranking:** Combines semantic similarity with business relevance
-- **Relevance Boosting:** Enhances results based on risk, compliance, and criticality factors
-- **Score Normalization:** Converts raw distances to interpretable 0-1 similarity scores
-
-**Performance Characteristics:**
-
-- **Time Complexity:** O(log n) for FAISS search + O(k) for post-processing
-- **Memory Usage:** Efficient vector storage with float32 precision
-- **Cache Hit Rate:** ~80% for repeated common queries
+- **LRU Caching:** Caches 50 most recent search results
+- **Efficient Vector Operations:** Optimized FAISS operations with float32 precision
+- **Smart Filtering:** Applies business logic to enhance search relevance
 
 #### `get_suggestions(ao_name, use_llm)`
 
@@ -1055,7 +819,7 @@ def _calculate_relevance_boost(self, ao_data: Dict, query: str) -> float:
 def get_suggestions(self, ao_name: Optional[str] = None, use_llm: bool = False) -> Dict
 ```
 
-**Purpose:** Generate comprehensive suggestions for an Application Owner.
+**Purpose:** Generates comprehensive security analysis and recommendations for a specific Application Owner.
 
 **Parameters:**
 
@@ -1064,89 +828,728 @@ def get_suggestions(self, ao_name: Optional[str] = None, use_llm: bool = False) 
 
 **Return Value:** Complete suggestions response with structured analysis
 
+**Process Flow:**
+
+1. **AO Lookup:** Intelligent fuzzy matching for AO names (exact, partial, word matching)
+2. **Data Aggregation:** Comprehensive security metrics compilation
+3. **Risk Assessment:** Advanced scoring algorithms for security posture
+4. **AI Enhancement:** Optional LLM analysis for deeper insights
+5. **Response Formatting:** Structured JSON output with consistent format
+
 #### `_calculate_compliance_score(vuln_stats, avg_risk)`
 
 ```python
 def _calculate_compliance_score(self, vuln_stats: Dict, avg_risk: float) -> float
 ```
 
-**Purpose:** Calculates compliance score based on vulnerability profile and risk.
+**Purpose:** Calculates compliance score using advanced weighted algorithm.
 
 **Algorithm Details:**
 
-```python
-def _calculate_compliance_score(self, vuln_stats: Dict, avg_risk: float) -> float:
-    """
-    Advanced compliance scoring algorithm
-
-    Args:
-        vuln_stats: Dictionary containing vulnerability counts by severity
-        avg_risk: Average risk score for the Application Owner
-
-    Returns:
-        Float between 0-100 representing compliance percentage
-    """
-    # Base compliance score (perfect score)
-    base_score = 100.0
-
-    # Vulnerability penalties (weighted by severity)
-    penalties = {
-        'critical': 20,  # Each critical vulnerability = -20 points
-        'high': 10,      # Each high vulnerability = -10 points
-        'medium': 5,     # Each medium vulnerability = -5 points
-        'low': 1         # Each low vulnerability = -1 point
-    }
-
-    # Calculate vulnerability penalty
-    vuln_penalty = 0
-    for severity, count in vuln_stats.items():
-        if severity.lower() in penalties:
-            vuln_penalty += count * penalties[severity.lower()]
-
-    # Risk adjustment factor (additional penalty for high risk)
-    risk_penalty = 0
-    if avg_risk > 7:
-        risk_penalty = 15  # High risk penalty
-    elif avg_risk > 5:
-        risk_penalty = 8   # Medium risk penalty
-    elif avg_risk > 3:
-        risk_penalty = 3   # Low risk penalty
-
-    # Calculate final score
-    final_score = base_score - vuln_penalty - risk_penalty
-
-    # Ensure score stays within bounds [0, 100]
-    return max(0.0, min(100.0, final_score))
-```
-
-**Step-by-Step Process:**
-
-1. **Base Score (100):** Start with perfect compliance
-2. **Critical Penalty:** -20 points per critical vulnerability (highest impact)
-3. **High Penalty:** -10 points per high vulnerability
-4. **Medium Penalty:** -5 points per medium vulnerability
-5. **Low Penalty:** -1 point per low vulnerability
-6. **Risk Adjustment:** Additional penalty based on overall risk level
-7. **Boundary Enforcement:** Clamp result between 0-100
+- **Base Score:** Starts with 100 (perfect compliance)
+- **Vulnerability Penalties:**
+  - Critical: -20 points each
+  - High: -10 points each
+  - Medium: -5 points each
+  - Low: -1 point each
+- **Risk Adjustment:** Additional penalties based on overall risk level
+- **Boundary Enforcement:** Ensures score stays within 0-100 range
 
 **Example Calculation:**
 
 ```
-AO with: 2 critical, 5 high, 10 medium, 15 low vulnerabilities, avg_risk = 6.5
-
-Base Score: 100
-Critical Penalty: 2 × 20 = -40
-High Penalty: 5 × 10 = -50
-Medium Penalty: 10 × 5 = -50
-Low Penalty: 15 × 1 = -15
+AO with: 1 critical, 3 high, 8 medium, 12 low vulns, avg_risk = 5.5
+Base: 100
+Penalties: (1×20) + (3×10) + (8×5) + (12×1) = 82
 Risk Penalty: 8 (avg_risk > 5)
+Final Score: 100 - 82 - 8 = 10
+```
 
-Final Score: 100 - 40 - 50 - 50 - 15 - 8 = -63 → 0 (clamped)
+#### `_determine_criticality(avg_risk, vuln_stats)`
+
+```python
+def _determine_criticality(self, avg_risk: float, vuln_stats: Dict) -> str
+```
+
+**Purpose:** Determines application criticality based on risk profile and vulnerabilities.
+
+**Decision Logic:**
+
+- **Critical:** avg_risk ≥ 8 OR any critical vulnerabilities
+- **High:** avg_risk ≥ 6 OR > 5 high vulnerabilities
+- **Medium:** avg_risk ≥ 4 OR any high vulnerabilities
+- **Low:** All other cases
+
+#### `_determine_environment(applications)`
+
+```python
+def _determine_environment(self, applications: set) -> str
+```
+
+**Purpose:** Determines environment type based on application names.
+
+**Detection Logic:**
+
+- **Production:** Contains 'prod' or 'production'
+- **Test/Staging:** Contains 'test' or 'staging'
+- **Development:** All other cases
+
+#### `_determine_patching_status(vulnerabilities)`
+
+```python
+def _determine_patching_status(self, vulnerabilities: List[Dict]) -> str
+```
+
+**Purpose:** Determines patching status based on vulnerability closure rates.
+
+**Status Calculation:**
+
+- **Up-to-date:** All vulnerabilities closed
+- **Outdated:** > 50% vulnerabilities still open
+- **Pending:** Some vulnerabilities open but < 50%
+
+#### `generate_llm_search_analysis(query, matching_aos)`
+
+```python
+def generate_llm_search_analysis(self, query: str, matching_aos: List[Dict]) -> str
+```
+
+**Purpose:** Generates comprehensive LLM analysis for search results.
+
+**Features:**
+
+- Analyzes search patterns and trends
+- Identifies high-priority Application Owners
+- Provides comparative risk assessment
+- Generates actionable recommendations
+- Creates executive-level summaries
+
+### 6.5. ResponseFormatter Class
+
+The ResponseFormatter class transforms raw LLM output into consistent, structured JSON format for easy integration.
+
+#### `format_search_analysis(raw_ai_response)`
+
+```python
+@staticmethod
+def format_search_analysis(raw_ai_response: str) -> Dict
+```
+
+**Purpose:** Converts raw LLM search analysis into structured JSON.
+
+**Return Structure:**
+
+```json
+{
+	"search_summary": "Brief overview of findings",
+	"key_findings": ["Finding 1", "Finding 2"],
+	"risk_analysis": "Risk assessment details",
+	"priority_attention": [
+		{
+			"ao_name": "AO Name",
+			"risk_score": "7.5",
+			"reason": "Specific concern",
+			"urgency": "High"
+		}
+	],
+	"recommended_actions": ["Action 1", "Action 2"],
+	"comparative_insights": "Comparison analysis"
+}
+```
+
+#### `format_suggestions_analysis(raw_ai_response)`
+
+```python
+@staticmethod
+def format_suggestions_analysis(raw_ai_response: str) -> Dict
+```
+
+**Purpose:** Converts raw LLM suggestions analysis into structured JSON.
+
+**Return Structure:**
+
+```json
+{
+    "executive_summary": "High-level overview",
+    "critical_findings": ["Critical issue 1", "Critical issue 2"],
+    "risk_assessment": "Detailed risk analysis",
+    "immediate_actions": [
+        {
+            "action": "Specific action",
+            "priority": "High",
+            "timeline": "1-2 weeks",
+            "category": "Security"
+        }
+    ],
+    "short_term_goals": [...],
+    "long_term_strategy": [...],
+    "compliance_recommendations": [...],
+    "comparative_analysis": "Peer comparison"
+}
+```
+
+#### `_extract_action_items(text)`
+
+```python
+@staticmethod
+def _extract_action_items(text: str) -> List[Dict]
+```
+
+**Purpose:** Extracts action items with metadata from text.
+
+**Features:**
+
+- **Timeline Detection:** Identifies time references (weeks, months, days)
+- **Priority Assignment:** Categorizes based on urgency keywords
+- **Category Classification:** Groups by Security, Compliance, Training, Monitoring, General
+- **Smart Parsing:** Handles various bullet point and numbering formats
+
+#### `_categorize_action(action_text)`
+
+```python
+@staticmethod
+def _categorize_action(action_text: str) -> str
+```
+
+**Purpose:** Automatically categorizes actions based on content analysis.
+
+**Categories:**
+
+- **Security:** Vulnerability remediation, security controls
+- **Compliance:** Regulatory requirements, audit findings
+- **Training:** Security awareness, skill development
+- **Monitoring:** Automated scanning, alerting systems
+- **General:** Process improvements, policy updates
+
+### 6.6. Flask API Endpoints
+
+#### `get_suggestions()` - POST /suggestions
+
+**Purpose:** Main endpoint for getting comprehensive AO-specific analysis.
+
+**Request Validation:**
+
+- Validates JSON format and required parameters
+- Sanitizes input data
+- Provides helpful error messages with examples
+
+**Response Handling:**
+
+- Structured success responses with timestamps
+- Standardized error responses with error codes
+- Graceful degradation when LLM is unavailable
+
+#### `search_aos()` - POST /search
+
+**Purpose:** Semantic search endpoint with AI-enhanced analysis.
+
+**Features:**
+
+- Input validation and sanitization
+- Top-k result limiting (max 20)
+- LLM analysis integration
+- Structured response formatting
+- Performance monitoring
+
+#### `get_stats()` - GET /stats
+
+**Purpose:** System statistics and health metrics.
+
+**Metrics Provided:**
+
+- Total Application Owners count
+- Total applications managed
+- Average risk score across all AOs
+- High-risk AOs count
+- Last system update timestamp
+
+#### `health_check()` - GET /health
+
+**Purpose:** System health verification.
+
+**Health Checks:**
+
+- RAG system initialization status
+- Model loading verification
+- Cache availability status
+- API version information
+
+### 6.7. Error Handling Patterns
+
+#### Graceful Degradation
+
+```python
+def get_suggestions_with_fallback(self, ao_name: str) -> Dict:
+    """Example of graceful degradation pattern"""
+    try:
+        # Primary functionality with LLM
+        return self.get_suggestions_with_llm(ao_name)
+    except LLMUnavailableError:
+        # Fallback to basic analysis
+        return self.get_basic_suggestions(ao_name)
+    except Exception as e:
+        # Last resort error response
+        return self.create_error_response("INTERNAL_ERROR", str(e))
+```
+
+#### Input Validation
+
+```python
+def validate_ao_name(self, ao_name: str) -> str:
+    """Comprehensive input validation"""
+    if not ao_name or not isinstance(ao_name, str):
+        raise ValueError("AO name must be a non-empty string")
+
+    cleaned = ao_name.strip()
+    if len(cleaned) < 2:
+        raise ValueError("AO name must be at least 2 characters")
+
+    if len(cleaned) > 255:
+        raise ValueError("AO name too long (max 255 characters)")
+
+    return cleaned
+```
+
+#### Resource Management
+
+```python
+class CacheManager:
+    """Handles cache lifecycle and cleanup"""
+
+    def __enter__(self):
+        self.load_cache()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.cleanup_resources()
+        if exc_type:
+            self.handle_cleanup_error(exc_type, exc_val)
+```
+
+### 6.8. Performance Optimization Functions
+
+#### Cache Management
+
+- **Multi-level Caching:** Disk cache, LRU memory cache, and object caching
+- **Smart Invalidation:** Version checking, timestamp validation, and dependency tracking
+- **Efficient Storage:** Pickle serialization with compression
+
+#### Vector Operations
+
+- **Batch Processing:** Optimized embedding generation in configurable batches
+- **Memory Management:** Efficient float32 storage and normalized vectors
+- **FAISS Optimization:** IndexFlatIP for cosine similarity on normalized vectors
+
+#### Search Optimization
+
+- **Query Caching:** LRU cache for identical search queries
+- **Result Ranking:** Multi-factor scoring with business logic enhancement
+- **Performance Monitoring:** Response time tracking and optimization alerts
+
+---
+
+## 7. Calculation Formulas and Standards
+
+### 7.1. Overview
+
+This section provides a comprehensive reference for all mathematical formulas, algorithms, and calculation standards used throughout the AO RAG API system. Understanding these calculations is essential for interpreting results, customizing the system, and ensuring accurate security assessments.
+
+### 7.2. Vulnerability Statistics Calculations
+
+#### 7.2.1. Vulnerability Count by Severity
+
+The system categorizes vulnerabilities into four severity levels and counts occurrences for each Application Owner:
+
+```python
+# Severity Classification
+severity_levels = ['Critical', 'High', 'Medium', 'Low']
+
+# Count Formula
+severity_counts = df_group['Severity'].value_counts()
+stats = {
+    'critical_vulnerabilities': severity_counts.get('Critical', 0),
+    'high_vulnerabilities': severity_counts.get('High', 0),
+    'medium_vulnerabilities': severity_counts.get('Medium', 0),
+    'low_vulnerabilities': severity_counts.get('Low', 0),
+    'total_vulnerabilities': len(df_group)
+}
+```
+
+**Standards Used:**
+
+- **Critical**: CVSS 9.0-10.0, immediate action required
+- **High**: CVSS 7.0-8.9, priority patching needed
+- **Medium**: CVSS 4.0-6.9, scheduled patching
+- **Low**: CVSS 0.1-3.9, monitoring required
+
+### 7.3. Risk Metrics Calculations
+
+#### 7.3.1. Average Risk Score
+
+Calculates the mean risk score across all vulnerabilities for an Application Owner:
+
+```python
+# Formula
+avg_risk_score = round(risk_scores.mean(), 2) if not risk_scores.empty else 0
+max_risk_score = round(risk_scores.max(), 2) if not risk_scores.empty else 0
+```
+
+**Calculation Details:**
+
+- **Input**: Risk_Score column values (0-10 scale)
+- **Output**: Rounded to 2 decimal places
+- **Fallback**: Returns 0 if no risk scores available
+
+#### 7.3.2. CVSS Score Analysis
+
+Common Vulnerability Scoring System (CVSS) v3.1 standard implementation:
+
+```python
+# CVSS Score Processing
+avg_cvss_score = round(cvss_scores.mean(), 2) if not cvss_scores.empty else 0
+```
+
+**CVSS Scale Interpretation:**
+
+- **0.0**: No vulnerability
+- **0.1-3.9**: Low severity
+- **4.0-6.9**: Medium severity
+- **7.0-8.9**: High severity
+- **9.0-10.0**: Critical severity
+
+### 7.4. Compliance Score Algorithm
+
+#### 7.4.1. Base Compliance Score Formula
+
+The compliance score uses a penalty-based system starting from 100:
+
+```python
+def _calculate_compliance_score(vuln_stats: Dict, avg_risk: float) -> float:
+    base_score = 100
+
+    # Vulnerability penalties
+    base_score -= vuln_stats['critical'] * 20  # -20 points per critical
+    base_score -= vuln_stats['high'] * 10      # -10 points per high
+    base_score -= vuln_stats['medium'] * 5     # -5 points per medium
+    base_score -= vuln_stats['low'] * 1        # -1 point per low
+
+    # Risk score penalties
+    if avg_risk > 8:
+        base_score -= 20        # High risk penalty
+    elif avg_risk > 6:
+        base_score -= 10        # Medium risk penalty
+    elif avg_risk > 4:
+        base_score -= 5         # Low risk penalty
+
+    return max(0, round(base_score, 1))  # Minimum score is 0
+```
+
+**Penalty Structure:**
+
+- **Critical Vulnerabilities**: -20 points each
+- **High Vulnerabilities**: -10 points each
+- **Medium Vulnerabilities**: -5 points each
+- **Low Vulnerabilities**: -1 point each
+- **High Risk (>8)**: -20 points
+- **Medium Risk (6-8)**: -10 points
+- **Low Risk (4-6)**: -5 points
+
+#### 7.4.2. Compliance Score Interpretation
+
+| Score Range | Classification | Action Required             |
+| ----------- | -------------- | --------------------------- |
+| 90-100      | Excellent      | Maintain current posture    |
+| 80-89       | Good           | Monitor and improve         |
+| 70-79       | Fair           | Address high/critical items |
+| 60-69       | Poor           | Immediate remediation       |
+| 0-59        | Critical       | Emergency response          |
+
+### 7.5. Criticality Assessment Algorithm
+
+#### 7.5.1. Application Criticality Formula
+
+Determines the criticality level based on combined risk and vulnerability factors:
+
+```python
+def _determine_criticality(avg_risk: float, vuln_stats: Dict) -> str:
+    if avg_risk >= 8 or vuln_stats['critical'] > 0:
+        return 'Critical'    # Any critical vuln OR risk >= 8
+    elif avg_risk >= 6 or vuln_stats['high'] > 5:
+        return 'High'        # Risk 6-7.9 OR >5 high vulns
+    elif avg_risk >= 4 or vuln_stats['high'] > 0:
+        return 'Medium'      # Risk 4-5.9 OR any high vulns
+    else:
+        return 'Low'         # Risk <4 AND no high/critical vulns
+```
+
+**Decision Matrix:**
+
+| Condition                                          | Result       |
+| -------------------------------------------------- | ------------ |
+| Average Risk ≥ 8.0 OR Critical Vulnerabilities > 0 | **Critical** |
+| Average Risk ≥ 6.0 OR High Vulnerabilities > 5     | **High**     |
+| Average Risk ≥ 4.0 OR High Vulnerabilities > 0     | **Medium**   |
+| All other cases                                    | **Low**      |
+
+### 7.6. Environment Classification Algorithm
+
+#### 7.6.1. Environment Detection Logic
+
+Classifies applications into environment types based on naming patterns:
+
+```python
+def _determine_environment(applications: set) -> str:
+    app_list = [app.lower() for app in applications]
+
+    if any('prod' in app or 'production' in app for app in app_list):
+        return 'Production'
+    elif any('test' in app or 'staging' in app for app in app_list):
+        return 'Test/Staging'
+    else:
+        return 'Development'
+```
+
+**Classification Rules:**
+
+1. **Production**: Contains "prod" or "production" (case-insensitive)
+2. **Test/Staging**: Contains "test" or "staging" (case-insensitive)
+3. **Development**: Default for all other cases
+
+### 7.7. Patching Status Assessment
+
+#### 7.7.1. Patching Status Algorithm
+
+Determines patching status based on vulnerability closure rates:
+
+```python
+def _determine_patching_status(vulnerabilities: List[Dict]) -> str:
+    if not vulnerabilities:
+        return 'Up-to-date'
+
+    closed_statuses = ['closed', 'fixed', 'resolved']
+    open_vulns = sum(1 for v in vulnerabilities
+                    if v.get('status', '').lower() not in closed_statuses)
+    total_vulns = len(vulnerabilities)
+
+    if open_vulns == 0:
+        return 'Up-to-date'      # 100% closed
+    elif open_vulns / total_vulns > 0.5:
+        return 'Outdated'        # >50% open
+    else:
+        return 'Pending'         # ≤50% open
+```
+
+**Status Classifications:**
+
+| Open Vulnerability Ratio | Status         | Description                     |
+| ------------------------ | -------------- | ------------------------------- |
+| 0% (0 open)              | **Up-to-date** | All vulnerabilities resolved    |
+| 1-50% open               | **Pending**    | Majority resolved, some pending |
+| >50% open                | **Outdated**   | Significant patching backlog    |
+
+### 7.8. Time-Based Calculations
+
+#### 7.8.1. Average Days to Close
+
+Calculates the average time to resolve vulnerabilities:
+
+```python
+def _calculate_avg_days_to_close(vulnerabilities: List[Dict]) -> float:
+    days_list = [v.get('days_to_close', 0)
+                for v in vulnerabilities
+                if v.get('days_to_close', 0) > 0]
+
+    return round(sum(days_list) / len(days_list), 1) if days_list else 0
+```
+
+**Calculation Details:**
+
+- **Input**: Days_to_Close values from resolved vulnerabilities
+- **Filter**: Only includes positive values (>0 days)
+- **Output**: Rounded to 1 decimal place
+- **Fallback**: Returns 0 if no valid data
+
+#### 7.8.2. Scan Date Processing
+
+Latest scan date determination:
+
+```python
+def _get_latest_scan_date(vulnerabilities: List[Dict]) -> str:
+    # Implementation processes First_Detected_Date fields
+    # Returns most recent date in YYYY-MM-DD format
+    return datetime.now().strftime('%Y-%M-%d')  # Placeholder in current version
+```
+
+### 7.9. Similarity and Ranking Algorithms
+
+#### 7.9.1. Semantic Search Similarity
+
+Uses cosine similarity with normalized embeddings:
+
+```python
+# Embedding Processing
+query_embedding = model.encode([query])
+faiss.normalize_L2(query_embedding)  # L2 normalization for cosine similarity
+
+# Search with similarity threshold
+scores, indices = faiss_index.search(query_embedding.astype('float32'), top_k)
+
+# Relevance filtering
+relevance_threshold = 0.1  # Minimum similarity score
+valid_results = [(score, idx) for score, idx in zip(scores[0], indices[0])
+                 if score > relevance_threshold]
+```
+
+**Similarity Scoring:**
+
+- **Range**: 0.0 to 1.0 (after normalization)
+- **Threshold**: 0.1 minimum for inclusion
+- **Higher values**: More semantically similar
+- **Algorithm**: Cosine similarity with normalized L2 vectors
+
+#### 7.9.2. Result Ranking System
+
+Multi-factor ranking with business logic:
+
+```python
+# Ranking factors (in order of priority)
+1. Similarity Score (primary)
+2. Risk Score (secondary)
+3. Vulnerability Count (tertiary)
+4. Compliance Score (quaternary)
+
+# Rank assignment
+for i, (score, idx) in enumerate(sorted_results):
+    result['rank'] = i + 1
+    result['similarity_score'] = float(score)
+```
+
+### 7.10. Data Validation Standards
+
+#### 7.10.1. Input Validation Rules
+
+**Numeric Fields:**
+
+- Risk_Score: 0.0 ≤ value ≤ 10.0
+- CVSS_Score: 0.0 ≤ value ≤ 10.0
+- Days_to_Close: value ≥ 0
+
+**String Fields:**
+
+- Severity: Must be in ['Critical', 'High', 'Medium', 'Low']
+- Status: Case-insensitive matching for closed states
+
+**Date Fields:**
+
+- Format: YYYY-MM-DD or compatible pandas datetime
+- Range: Must be valid calendar dates
+
+#### 7.10.2. Data Quality Metrics
+
+**Completeness Score:**
+
+```python
+completeness = (non_null_values / total_expected_values) * 100
+```
+
+**Accuracy Thresholds:**
+
+- Risk scores outside 0-10 range: Flagged for review
+- CVSS scores outside 0-10 range: Auto-corrected or flagged
+- Invalid severity levels: Defaulted to 'Unknown'
+
+### 7.11. Performance Optimization Formulas
+
+#### 7.11.1. Cache Hit Rate
+
+```python
+cache_hit_rate = (cache_hits / total_requests) * 100
+```
+
+**Target Performance:**
+
+- Cache hit rate: >80%
+- Query response time: <100ms
+- Embedding generation: <5 seconds per 1000 items
+
+#### 7.11.2. Memory Usage Optimization
+
+**Embedding Storage:**
+
+```python
+memory_per_embedding = dimension * 4 bytes  # float32
+total_memory = num_embeddings * memory_per_embedding
+```
+
+**FAISS Index Size:**
+
+```python
+index_memory = num_vectors * dimension * 4 bytes + overhead
+```
+
+### 7.12. Error Handling Standards
+
+#### 7.12.1. Graceful Degradation
+
+**Missing Data Handling:**
+
+- Empty DataFrames: Return zero values with appropriate flags
+- Invalid scores: Use fallback calculations
+- Network timeouts: Return cached results when available
+
+**Error Response Format:**
+
+```json
+{
+	"error": "error_type",
+	"message": "human_readable_description",
+	"fallback_data": {},
+	"timestamp": "ISO_8601_timestamp"
+}
+```
+
+### 7.13. Algorithm Updates and Versioning
+
+#### 7.13.1. Version Compatibility
+
+**Current Version**: 2.0
+
+- **Breaking Changes**: Formula modifications require version increment
+- **Backward Compatibility**: Maintained for one major version
+- **Migration Path**: Automatic data conversion between compatible versions
+
+#### 7.13.2. Formula Customization Points
+
+Key areas designed for customization:
+
+- Compliance score penalty weights
+- Criticality thresholds
+- Similarity score thresholds
+- Environment classification patterns
+- Status classification mappings
+
+**Configuration File Example:**
+
+```python
+CALCULATION_CONFIG = {
+    'compliance_penalties': {
+        'critical': 20,
+        'high': 10,
+        'medium': 5,
+        'low': 1
+    },
+    'criticality_thresholds': {
+        'critical_risk': 8.0,
+        'high_risk': 6.0,
+        'medium_risk': 4.0
+    },
+    'similarity_threshold': 0.1
+}
 ```
 
 ---
 
-## 7. Installation & Setup
+## 8. Installation & Setup
 
 ### 7.1. Prerequisites
 
@@ -1378,7 +1781,7 @@ waitress-serve --host=0.0.0.0 --port=5001 minimal_ao_api:app
 
 ---
 
-## 8. Usage Examples
+## 9. Usage Examples
 
 ### 8.1. PowerShell Examples (Windows)
 
@@ -1525,7 +1928,7 @@ curl -X POST -H "Content-Type: application/json" \
 
 ---
 
-## 9. Microsoft Server Integration
+## 10. Microsoft Server Integration
 
 ### 9.1. Windows Server Deployment
 
@@ -1675,7 +2078,7 @@ class SQLServerDataLayer:
 
 ---
 
-## 10. .NET Integration Strategies
+## 11. .NET Integration Strategies
 
 ### 10.1. C# HTTP Client Implementation
 
@@ -1895,7 +2298,7 @@ public class ApplicationOwner
 
 ---
 
-## 11. Deployment Options
+## 12. Deployment Options
 
 ### 11.1. Docker Deployment
 
@@ -1989,7 +2392,7 @@ gunicorn --workers 4 --bind 0.0.0.0:5001 --timeout 120 minimal_ao_api:app
 
 ---
 
-## 12. Security Considerations
+## 13. Security Considerations
 
 ### 12.1. Authentication Implementation
 
@@ -2069,7 +2472,7 @@ app.UseHsts();
 
 ---
 
-## 13. Performance Optimization
+## 14. Performance Optimization
 
 ### 13.1. Caching Strategies
 
@@ -2136,7 +2539,7 @@ CREATE UNIQUE CLUSTERED INDEX IX_AOSecuritySummary_Id ON AOSecuritySummary(Id);
 
 ---
 
-## 14. Testing & Validation
+## 15. Testing & Validation
 
 ### 14.1. Testing Strategy Overview
 
@@ -3985,7 +4388,7 @@ The enhanced test suite ensures your AO RAG API is production-ready with compreh
 
 ---
 
-## 15. Troubleshooting
+## 16. Troubleshooting
 
 ### 15.1. Quick Troubleshooting Guide
 
@@ -4252,7 +4655,7 @@ def monitor_endpoint_performance(func):
 
 ---
 
-## 16. Migration Roadmap
+## 17. Migration Roadmap
 
 ### 16.1. Phase 1: Integration Setup (Weeks 1-2)
 
@@ -4313,7 +4716,7 @@ def monitor_endpoint_performance(func):
 
 ---
 
-## 17. File Structure & Project Organization
+## 18. File Structure & Project Organization
 
 ### 17.1. Complete File Structure
 
