@@ -574,7 +574,7 @@ def _build_faiss_index(self, embeddings: np.ndarray) -> faiss.Index:
 class Config:
     # Ollama LLM Configuration
     OLLAMA_URL = "http://localhost:11434/api/generate"
-    DEFAULT_MODEL = "llama3.2:1b"
+    DEFAULT_MODEL = "llama3.1:8b"
     OLLAMA_TIMEOUT = 30  # seconds
 
     # Data Source Configuration
