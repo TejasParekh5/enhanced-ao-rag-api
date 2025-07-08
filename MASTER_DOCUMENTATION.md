@@ -576,6 +576,7 @@ class Config:
     # Ollama LLM Configuration
     OLLAMA_URL = "http://localhost:11434/api/generate"
     DEFAULT_MODEL = "llama3.2:1b"
+    OLLAMA_TIMEOUT = 30  # seconds
 
     # Data Source Configuration
     EXCEL_FILE = "Cybersecurity_KPI_Minimal.xlsx"
